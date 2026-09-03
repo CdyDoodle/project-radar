@@ -1,0 +1,179 @@
+####################################################################
+# radar config
+#
+# Tune this file, then re-run `radar rank` (cheap, no network) to see
+# the ordering change. Nothing here is sacred -- the defaults are a
+# starting point for a senior engineer looking for hard problems.
+####################################################################
+
+[profile]
+# Free text. This goes into the ideation prompt verbatim, so be specific
+# about what you know, what you want to learn, and what you'd hate building.
+description = """
+Senior software engineer taking a deliberate gap year. Strong general
+engineering background; wants to go deep rather than wide. Looking for projects
+that are technically challenging, that produce something real other engineers
+would use or learn from, and that build durable expertise -- not tutorials, not
+CRUD apps, not thin wrappers over an LLM API.
+
+Interested in using AI both as a subject (inference, agents, model internals)
+and as a tool (AI-assisted development of otherwise-intractable systems work).
+Has roughly 6-12 months and no revenue pressure, so multi-month projects with a
+steep learning curve are in scope. Prefers projects with a crisp technical
+thesis that can be falsified early.
+"""
+
+[interests]
+# Weighted keywords. Higher = pulls harder. These are matched against title,
+# description, topics, language and the first chunk of the README.
+"inference" = 1.0
+"compiler" = 1.0
+"distributed" = 0.9
+"database" = 0.9
+"kernel" = 0.8
+"runtime" = 0.8
+"agent" = 0.8
+"llm" = 0.7
+"cuda" = 0.9
+"gpu" = 0.8
+"quantization" = 0.9
+"scheduler" = 0.7
+"observability" = 0.6
+"wasm" = 0.7
+"rust" = 0.7
+"zig" = 0.6
+"formal verification" = 0.9
+"program synthesis" = 1.0
+"static analysis" = 0.8
+"protocol" = 0.6
+"storage" = 0.7
+"simulation" = 0.6
+"reverse engineering" = 0.7
+"emulator" = 0.7
+
+[rank]
+freshness_half_life_days = 45
+stale_after_days = 120
+mega_star_threshold = 40000
+
+[rank.diversify]
+# Redundancy control. Scoring ranks items independently, so N implementations of
+# the same idea all score well and all reach the top -- which is exactly what
+# happened with local LLM inference engines. This re-ranks the shortlist so each
+# pick has to add something the ones above it didn't.
+#
+#   lambda = 1.00  pure score order (off)
+#   lambda = 0.80  light touch
+#   lambda = 0.65  default: inference 7/15 -> 3/15, costs ~4% mean score
+#   lambda = 0.50  saturated; no further effect on this corpus
+enabled = true
+lambda = 0.65
+# How much of the redundancy signal is conceptual vs. textual. Text similarity
+# alone rates two identical-in-spirit inference engines at ~0.1 because they
+# share no vocabulary, so the theme taxonomy has to carry most of the weight.
+theme_weight = 0.75
+
+[rank.weights]
+velocity = 1.0
+corroboration = 1.4
+watchlist = 1.8
+fit = 1.6
+freshness = 0.7
+depth = 0.9
+
+[rank.penalties]
+slop = 2.5
+chatter = 1.2
+stale = 0.6
+archived = 1.5
+mega = 0.5
+seen_before = 0.3
+
+####################################################################
+# Sources
+####################################################################
+
+[sources.github_starred]
+enabled = true
+within_days = 120
+pages_per_user = 1
+# THE most important knob in this file. These are the engineers whose taste
+# you're borrowing. Replace them with people whose work you actually respect --
+# the tool gets dramatically better when this list is personal.
+users = [
+  "karpathy",
+  "jart",
+  "antirez",
+  "simonw",
+  "geohot",
+  "mitchellh",
+  "bellard",
+  "tsoding",
+  "orlp",
+  "matklad",
+  "burntsushi",
+  "ggerganov",
+]
+
+[sources.github_search]
+enabled = true
+created_within_days = 240
+min_stars = 120
+per_query = 40
+# Each query is combined with the created/stars filters above.
+queries = [
+  "topic:compiler",
+  "topic:database",
+  "topic:distributed-systems",
+  "topic:inference",
+  "topic:llm language:rust",
+  "topic:llm language:c",
+  "topic:gpu",
+  "topic:wasm",
+  "topic:observability",
+  "language:zig",
+  "language:rust topic:performance",
+  "topic:formal-verification",
+]
+
+[sources.github_trending]
+enabled = true
+windows = ["daily", "weekly"]
+languages = ["", "rust", "zig", "c", "cpp", "go"]
+
+[sources.hackernews]
+enabled = true
+within_days = 21
+min_points = 120
+show_hn_min_points = 40
+limit = 120
+
+[sources.lobsters]
+enabled = true
+pages = 3
+min_score = 8
+
+[sources.arxiv]
+enabled = true
+within_days = 21
+per_category = 40
+categories = ["cs.LG", "cs.PL", "cs.DC", "cs.OS", "cs.DB", "cs.AR"]
+
+####################################################################
+# LLM ideation
+####################################################################
+
+[brief]
+model = "claude-opus-5"
+effort = "high"
+# How many top-ranked items get a per-item analysis pass.
+cards = 18
+# How many project briefs to synthesize from those cards.
+count = 8
+readme_chars = 8000
+max_workers = 6
+
+[storage]
+db = "radar.db"
+out_dir = "out"
+http_cache_seconds = 1800
