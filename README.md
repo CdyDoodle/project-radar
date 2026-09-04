@@ -182,6 +182,22 @@ can collapse or filter in one click.
 
 Together those took `other` from 30% of the corpus to 8%.
 
+**Coverage is not precision.** Chasing the first number wrecked the second:
+broad patterns tagged almost everything, and an audit of which regex branch
+actually fired found `\bsilicon\b` matching *"Apple Silicon"*, `\bprotocol\b`
+matching *"Model Context Protocol"*, `\blinux\b` matching every project that
+merely runs on it, and `\bpolicy\b` carrying half of `industry` off RL and
+scheduling policies. An inference server was tagged with seven themes.
+
+Tightening those to phrases naming the artifact cut average tags per item from
+2.09 to 1.62 and items with 5+ tags from 96 to 33, at the cost of `other` going
+8% → 13%. That's the right trade: a tag nobody trusts is worse than no tag.
+Judge changes here on **both** numbers, never coverage alone.
+
+`radar/themes.py` refuses to import if any pattern matches the empty string — a
+trailing `|` leaves an empty alternative that silently tags the entire corpus,
+and it *improves* every coverage metric while doing so, so it hides.
+
 ## How the briefs work
 
 Two passes, because a per-item summariser can only ever say "reimplement this".
