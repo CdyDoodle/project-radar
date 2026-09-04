@@ -128,6 +128,38 @@ Items are filed under one theme by the explicit priority order in
 the *rarest* matching theme, which sounds principled and files an LLM inference
 server under "graphics-media" because its README mentions rendering.
 
+## Balance: is AI the subject or the tool?
+
+Themes answer "what domain is this in". They can't answer the question that
+actually shapes a project list: is this repo **building the AI plumbing**, or
+**pointing AI at something else**? An inference engine and an agent-driven
+decompiler are both `ai-agents` by theme, and only one of them is a project
+about reverse engineering.
+
+`radar/axis.py` sorts every item into three:
+
+| | |
+|---|---|
+| `ai-infra` | engines, harnesses, routers, serving, training — the plumbing |
+| `ai-application` | AI pointed at a domain: binaries, video, science, security |
+| `non-ai` | no AI at all — databases, compilers, kernels |
+
+Three values, not two, because ~45% of the corpus is the third one and forcing
+a binary would file a Postgres rewrite as an "application".
+
+This matters because **velocity favours infrastructure** — inference engines
+are what trend — so the top of the list fills with them even though infra is
+only ~12% of the corpus. `[rank.balance]` sets the shortlist mix (default
+30/40/30) as targets rather than caps: a bucket that can't fill its share hands
+the slots back instead of shortening the list. Filter by it with the `focus`
+chips in the dashboard, or see one item's verdict with `radar show`.
+
+Two classifier subtleties worth knowing if you tune the patterns. A bare "MCP
+server" is *not* infrastructure — it usually bridges a domain tool (a debugger,
+a database) to a model, which makes it an application; only MCP gateways and
+frameworks are plumbing. And "give agents an operating system" needs matching
+as a relationship rather than a phrase, because the words end up separated.
+
 ## Themes
 
 26 of them, plus `other`. Two rules keep the taxonomy honest, both learned by

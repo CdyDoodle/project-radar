@@ -13,7 +13,7 @@ from pathlib import Path
 
 from jinja2 import Environment
 
-from radar import diversify, themes
+from radar import axis, diversify, themes
 from radar.config import Config
 from radar.models import now
 from radar.rank import explain
@@ -112,6 +112,7 @@ a{color:var(--ink)}a:hover{color:var(--accent)}
   border:1px solid var(--line);border-radius:3px;padding:1px 5px;
   margin:0 3px 3px 0;display:inline-block}
 .tag.th{border-color:var(--accent);color:var(--accent)}
+.tag.ax{border-color:var(--good);color:var(--good)}
 .wide{overflow-x:auto}
 .empty{padding:40px 8px;text-align:center;color:var(--muted);font-family:var(--mono);
   font-size:13px}
@@ -194,7 +195,9 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
     <button id="collapse">collapse all</button>
   </div>
   <div class="bar-row chipset">
-    <span class="lbl">theme</span>
+    <span class="lbl">focus</span>
+    {% for a, lbl in axes %}<button data-axis="{{ a }}">{{ lbl }}</button>{% endfor %}
+    <span class="lbl" style="margin-left:12px">theme</span>
     {% for t in theme_names %}<button data-theme="{{ t }}">{{ t }}</button>{% endfor %}
   </div>
   <div class="bar-row chipset">
@@ -213,7 +216,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
     data-text="{{ (r.title ~ ' ' ~ r.summary ~ ' ' ~ (r.lang or '') ~ ' ' ~ r.topics|join(' ') ~ ' ' ~ r.themes|join(' '))|lower }}"
     data-sources="{{ r.sources|join(' ') }}"
     data-themes="{{ r.themes|join(' ') }}"
-    data-primary="{{ r.primary }}"
+    data-primary="{{ r.primary }}" data-axis="{{ r.axis }}"
     data-lang="{{ r.lang or '' }}"
     data-score="{{ r.score }}" data-vel="{{ r.velocity }}"
     data-age="{{ r.age_days }}" data-stars="{{ r.stars }}"
@@ -222,6 +225,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
   <td>
     <a href="{{ r.url }}"><strong>{{ r.title }}</strong></a>
     <span class="desc">{{ r.summary[:190] }}</span>
+    <span class="tag ax">{{ r.axis_label }}</span>
     {% if r.lang %}<span class="tag">{{ r.lang }}</span>{% endif %}
     {% for t in r.themes %}<span class="tag th">{{ t }}</span>{% endfor %}
     {% for s in r.sources %}<span class="tag">{{ s }}</span>{% endfor %}
@@ -246,7 +250,7 @@ const body=$('#body'), q=$('#q'), showSel=$('#show'), sortSel=$('#sort'),
       langSel=$('#lang'), groupBtn=$('#group'), collapseBtn=$('#collapse'),
       countEl=$('#count'), emptyEl=$('#empty');
 const items=[...body.querySelectorAll('tr.item')];
-const state={src:'', themes:new Set(), group:true, collapsed:new Set()};
+const state={src:'', themes:new Set(), axes:new Set(), group:true, collapsed:new Set()};
 
 try{ const s=JSON.parse(localStorage.getItem('radar-prefs')||'{}');
   if(s.show) showSel.value=s.show; if(s.sort) sortSel.value=s.sort;
@@ -274,6 +278,7 @@ function matches(r){
   if(t && !r.dataset.text.includes(t)) return false;
   if(state.src && !r.dataset.sources.split(' ').includes(state.src)) return false;
   if(langSel.value && r.dataset.lang!==langSel.value) return false;
+  if(state.axes.size && !state.axes.has(r.dataset.axis)) return false;
   if(state.themes.size){
     const own=r.dataset.themes.split(' ').filter(Boolean);
     if(!own.some(x=>state.themes.has(x))) return false;
@@ -353,13 +358,18 @@ document.querySelectorAll('button[data-src]').forEach(b=>b.addEventListener('cli
   const v=b.dataset.src, on=state.src===v;
   document.querySelectorAll('button[data-src]').forEach(x=>x.classList.remove('on'));
   state.src = on?'':v; if(!on) b.classList.add('on'); render();}));
+document.querySelectorAll('button[data-axis]').forEach(b=>b.addEventListener('click',()=>{
+  const v=b.dataset.axis;
+  if(state.axes.has(v)){state.axes.delete(v); b.classList.remove('on');}
+  else {state.axes.add(v); b.classList.add('on');}
+  render();}));
 document.querySelectorAll('button[data-theme]').forEach(b=>b.addEventListener('click',()=>{
   const v=b.dataset.theme;
   if(state.themes.has(v)){state.themes.delete(v); b.classList.remove('on');}
   else {state.themes.add(v); b.classList.add('on');}
   render();}));
 $('#reset').addEventListener('click',()=>{
-  q.value=''; langSel.value=''; state.src=''; state.themes.clear();
+  q.value=''; langSel.value=''; state.src=''; state.themes.clear(); state.axes.clear();
   document.querySelectorAll('.chipset button').forEach(x=>x.classList.remove('on'));
   render();});
 document.addEventListener('keydown',e=>{
@@ -418,6 +428,8 @@ def _rows(store: Store, cfg: Config, limit: int) -> list[dict]:
             "topics": item.topics, "sources": sorted(item.sources),
             "themes": sorted(tset),
             "primary": themes.primary(tset),
+            "axis": axis.of_item(item),
+            "axis_label": axis.label(axis.of_item(item)),
             "why": explain(breakdown),
             "metrics_line": _metrics_line(item.metrics),
             "velocity": round(breakdown.get("components", {}).get("velocity", 0), 4),
@@ -443,6 +455,7 @@ def build(cfg: Config, store: Store, run_id: str | None = None,
     html = env.from_string(TEMPLATE).render(
         generated=generated, run_id=run_id, briefs=briefs, rows=rows,
         source_names=source_names, theme_names=theme_names, languages=languages,
+        axes=[(a, axis.label(a)) for a in axis.ALL_AXES],
         stats=stats, summary=(briefs[0].get("board_summary") if briefs else ""),
     )
     html_path = cfg.out_dir / "index.html"

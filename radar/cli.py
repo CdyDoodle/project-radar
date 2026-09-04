@@ -198,6 +198,9 @@ def cmd_show(args) -> int:
     console.print(f"[bold]{item.title}[/]  [dim]{row['score']:.2f}[/]")
     console.print(f"{item.url}\n")
     console.print(f"[dim]key[/]      {item.key}")
+    from radar import axis as _axis, themes as _themes
+    console.print(f"[dim]focus[/]    {_axis.label(_axis.of_item(item))}")
+    console.print(f"[dim]themes[/]   {', '.join(sorted(_themes.of_item(item))) or '-'}")
     console.print(f"[dim]sources[/]  {', '.join(sorted(item.sources))}")
     console.print(f"[dim]status[/]   {row['status']}")
     console.print(f"[dim]metrics[/]  {json.dumps(item.metrics, default=str)}")

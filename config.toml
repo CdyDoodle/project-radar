@@ -73,6 +73,22 @@ lambda = 0.65
 # share no vocabulary, so the theme taxonomy has to carry most of the weight.
 theme_weight = 0.75
 
+[rank.balance]
+# Shortlist mix across the infra/application axis (radar/axis.py).
+#
+# Velocity favours AI infrastructure -- inference engines are what trend -- so
+# without a quota the top of the list fills with them even though they are only
+# ~12% of the corpus. These are targets, not caps: a bucket that cannot fill
+# its share hands the slots to the others rather than shortening the list.
+#
+# "ai-infra"       building the plumbing: engines, harnesses, routers, training
+# "ai-application" AI pointed at a domain: reverse engineering, video, science
+# "non-ai"         no AI at all -- databases, compilers, kernels
+enabled = true
+"ai-infra" = 0.30
+"ai-application" = 0.40
+"non-ai" = 0.30
+
 [rank.weights]
 velocity = 1.0
 corroboration = 1.4
@@ -134,6 +150,23 @@ queries = [
   "language:zig",
   "language:rust topic:performance",
   "topic:formal-verification",
+  # Applied AI: hard domains where AI is the tool rather than the subject.
+  # Every query above hunts AI infrastructure, which is why the feed filled
+  # with inference engines. Single domain topics work far better here than
+  # topic pairs or free text -- GitHub topics are under-applied, so
+  # "topic:llm topic:fuzzing" returns nothing while "topic:fuzzing" returns
+  # the real projects and the ranker sorts out which of them use AI.
+  "topic:reverse-engineering",
+  "topic:binary-analysis",
+  "topic:static-analysis",
+  "topic:penetration-testing",
+  "topic:robotics",
+  "topic:computer-vision",
+  "topic:speech-recognition",
+  "topic:bioinformatics",
+  "topic:autonomous-driving",
+  "topic:code-review",
+  "topic:mcp-server",
 ]
 
 [sources.github_trending]

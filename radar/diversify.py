@@ -134,21 +134,80 @@ def row_text(store, row) -> str:
                      item.lang or ""])
 
 
-def diversified(store, rows: list, cfg, k: int) -> list:
-    """Apply MMR to a ranked row list if enabled in config."""
+def _mmr_rows(store, rows: list, cfg, k: int) -> list:
     from radar import themes
 
-    if not cfg.get("rank.diversify.enabled", True):
-        return rows[:k]
     lam = float(cfg.get("rank.diversify.lambda", 0.65))
     tw = float(cfg.get("rank.diversify.theme_weight", 0.75))
-    # Consider a wider pool than we return, so there is something to swap in.
-    pool = rows[:max(k * 4, k + 35)]
     texts, theme_sets = [], []
-    for r in pool:
+    for r in rows:
         item = store.to_item(r)
         texts.append(" ".join([item.title, item.summary or "",
                                " ".join(item.topics), item.lang or ""]))
         theme_sets.append(themes.of_item(item))
-    return mmr(pool, texts, theme_sets, k=k, lam=lam, theme_weight=tw,
-               scores=[r["score"] for r in pool])
+    return mmr(rows, texts, theme_sets, k=k, lam=lam, theme_weight=tw,
+               scores=[r["score"] for r in rows])
+
+
+def _quotas(targets: dict[str, float], k: int, available: dict[str, int]) -> dict[str, int]:
+    """Largest-remainder apportionment, capped by what each bucket actually has.
+
+    Slots freed by an under-supplied bucket are handed to the others rather
+    than left empty -- asking for a third infrastructure when only two good
+    ones exist should not shrink the list.
+    """
+    weights = {k_: max(0.0, float(v)) for k_, v in targets.items()}
+    total = sum(weights.values()) or 1.0
+    quota, leftover = {}, k
+    for name, w in weights.items():
+        want = min(int(k * w / total), available.get(name, 0))
+        quota[name] = want
+        leftover -= want
+    # Hand out remaining slots to whoever still has candidates, richest first.
+    while leftover > 0:
+        room = [n for n in weights if available.get(n, 0) > quota.get(n, 0)]
+        if not room:
+            break
+        room.sort(key=lambda n: -(available[n] - quota[n]))
+        quota[room[0]] += 1
+        leftover -= 1
+    return quota
+
+
+def diversified(store, rows: list, cfg, k: int) -> list:
+    """Redundancy-filter a ranked row list, optionally balanced across axes.
+
+    Two separate concerns. MMR stops near-identical projects stacking; the
+    balance step stops one *kind* of project owning the list. Velocity favours
+    AI infrastructure -- inference engines are what trend -- so without an
+    explicit quota the top fills with them even when the corpus is mostly
+    something else.
+    """
+    if not cfg.get("rank.diversify.enabled", True):
+        return rows[:k]
+    # A wider pool than we return, so there is something to swap in.
+    pool = rows[:max(k * 4, k + 35)]
+
+    targets = cfg.get("rank.balance", {}) or {}
+    targets = {k_: v for k_, v in targets.items() if k_ != "enabled"}
+    if not cfg.get("rank.balance.enabled", True) or not targets:
+        return _mmr_rows(store, pool, cfg, k)
+
+    from radar import axis
+
+    buckets: dict[str, list] = {name: [] for name in targets}
+    for r in pool:
+        name = axis.of_item(store.to_item(r))
+        buckets.setdefault(name, []).append(r)
+
+    quota = _quotas(targets, k, {n: len(v) for n, v in buckets.items()})
+    picked = []
+    for name, want in quota.items():
+        if want > 0 and buckets.get(name):
+            picked.extend(_mmr_rows(store, buckets[name], cfg, want))
+
+    # Restore the original ranked order across buckets: balance is about
+    # membership, not about interleaving the list in a fixed pattern.
+    position = {id(r): i for i, r in enumerate(pool)}
+    picked.sort(key=lambda r: position.get(id(r), 1 << 30))
+    return picked[:k]
