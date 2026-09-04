@@ -128,6 +128,28 @@ Items are filed under one theme by the explicit priority order in
 the *rarest* matching theme, which sounds principled and files an LLM inference
 server under "graphics-media" because its README mentions rendering.
 
+## Themes
+
+26 of them, plus `other`. Two rules keep the taxonomy honest, both learned by
+watching it fail:
+
+**Match what a thing is, not what it mentions.** A bare `\bllm\b` pattern filed
+agent frameworks and a video editor as inference engines, because everything
+built this year mentions LLMs — it claimed 24% of the corpus. A bare `emulator`
+caught every *terminal* emulator; a bare `orchestrat` caught a Dockerfile
+linter; a bare `google` filed **googletest** as industry news. Patterns name
+the artifact, not the buzzword, and `gpu-hpc` outranks `os-kernel` because a GPU
+kernel is not an OS kernel.
+
+**Some items have no theme because they aren't projects.** A third of the feed
+arrives from HN and Lobsters as a bare headline — "Restroom Archive", "Europe's
+summer drought is so extreme", "Commodore 64 released September 1, 1982". No
+pattern list will ever bucket those. They're caught structurally instead: a
+bare link with no repo and no paper behind it becomes `discussion`, which you
+can collapse or filter in one click.
+
+Together those took `other` from 30% of the corpus to 8%.
+
 ## How the briefs work
 
 Two passes, because a per-item summariser can only ever say "reimplement this".
