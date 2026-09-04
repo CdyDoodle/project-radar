@@ -97,8 +97,13 @@ td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 tr.item:hover td{background:var(--panel)}
 tr.grp td{background:transparent;border-bottom:2px solid var(--ink);
   padding:22px 8px 5px;font-family:var(--mono);font-size:11px;text-transform:uppercase;
-  letter-spacing:.1em;color:var(--accent);font-weight:700}
+  letter-spacing:.1em;color:var(--accent);font-weight:700;
+  cursor:pointer;user-select:none}
+tr.grp td:hover{background:var(--accent-soft)}
+tr.grp td:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 tr.grp td span{color:var(--muted);font-weight:400;letter-spacing:0;text-transform:none}
+tr.grp.closed td{border-bottom:1px dashed var(--line)}
+.chev{display:inline-block;width:11px;font-weight:700}
 .score{font-family:var(--mono);font-weight:600;white-space:nowrap}
 .why{font-family:var(--mono);font-size:11px;color:var(--muted)}
 a{color:var(--ink)}a:hover{color:var(--accent)}
@@ -186,6 +191,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
         {% for l in languages %}<option value="{{ l }}">{{ l }}</option>{% endfor %}
       </select></label>
     <button id="group">group by theme</button>
+    <button id="collapse">collapse all</button>
   </div>
   <div class="bar-row chipset">
     <span class="lbl">theme</span>
@@ -237,16 +243,21 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
 (function(){
 const $=s=>document.querySelector(s);
 const body=$('#body'), q=$('#q'), showSel=$('#show'), sortSel=$('#sort'),
-      langSel=$('#lang'), groupBtn=$('#group'), countEl=$('#count'), emptyEl=$('#empty');
+      langSel=$('#lang'), groupBtn=$('#group'), collapseBtn=$('#collapse'),
+      countEl=$('#count'), emptyEl=$('#empty');
 const items=[...body.querySelectorAll('tr.item')];
-const state={src:'', themes:new Set(), group:false};
+const state={src:'', themes:new Set(), group:true, collapsed:new Set()};
 
 try{ const s=JSON.parse(localStorage.getItem('radar-prefs')||'{}');
   if(s.show) showSel.value=s.show; if(s.sort) sortSel.value=s.sort;
-  if(s.lang) langSel.value=s.lang; if(s.group) state.group=s.group;
+  if(s.lang) langSel.value=s.lang;
+  // Explicit undefined check: a stored `false` must survive a `true` default.
+  if(s.group!==undefined) state.group=!!s.group;
+  if(Array.isArray(s.collapsed)) state.collapsed=new Set(s.collapsed);
 }catch(e){}
 function save(){ try{ localStorage.setItem('radar-prefs', JSON.stringify({
-  show:showSel.value, sort:sortSel.value, lang:langSel.value, group:state.group}));
+  show:showSel.value, sort:sortSel.value, lang:langSel.value, group:state.group,
+  collapsed:[...state.collapsed]}));
 }catch(e){} }
 
 const num=(r,k)=>parseFloat(r.dataset[k])||0;
@@ -270,11 +281,27 @@ function matches(r){
   return true;
 }
 
-function header(name, n){
-  const tr=document.createElement('tr'); tr.className='grp';
+function toggleGroup(name){
+  if(state.collapsed.has(name)) state.collapsed.delete(name);
+  else state.collapsed.add(name);
+  render();
+}
+
+function header(name, n, closed){
+  const tr=document.createElement('tr'); tr.className='grp'+(closed?' closed':'');
   const td=document.createElement('td'); td.colSpan=3;
-  td.textContent=name; const s=document.createElement('span');
-  s.textContent='  '+n+' item'+(n===1?'':'s'); td.appendChild(s);
+  td.setAttribute('role','button'); td.tabIndex=0;
+  td.setAttribute('aria-expanded', String(!closed));
+  const chev=document.createElement('b');
+  chev.className='chev'; chev.textContent = closed ? '\\u25B8' : '\\u25BE';
+  td.appendChild(chev);
+  td.appendChild(document.createTextNode(' '+name));
+  const s=document.createElement('span');
+  s.textContent='  '+n+' item'+(n===1?'':'s')+(closed?' (hidden)':'');
+  td.appendChild(s);
+  td.addEventListener('click',()=>toggleGroup(name));
+  td.addEventListener('keydown',e=>{
+    if(e.key==='Enter'||e.key===' '){e.preventDefault();toggleGroup(name);}});
   tr.appendChild(td); return tr;
 }
 
@@ -286,26 +313,42 @@ function render(){
   if(lim>0) vis=vis.slice(0,lim);
   items.forEach(r=>r.remove());
   body.textContent='';
+  let hidden=0, groupNames=[];
   if(state.group){
     const groups=new Map();
     vis.forEach(r=>{const k=r.dataset.primary||'other';
       if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(r);});
     const best=rs=>Math.max(...rs.map(r=>parseFloat(r.dataset.score)||0));
-    [...groups.entries()].sort((a,b)=>{
+    const ordered=[...groups.entries()].sort((a,b)=>{
         if(a[0]==='other') return 1; if(b[0]==='other') return -1;
-        return best(b[1])-best(a[1]);})
-      .forEach(([name,rs])=>{ body.appendChild(header(name,rs.length));
-        rs.forEach(r=>body.appendChild(r)); });
+        return best(b[1])-best(a[1]);});
+    groupNames=ordered.map(g=>g[0]);
+    ordered.forEach(([name,rs])=>{
+      const closed=state.collapsed.has(name);
+      body.appendChild(header(name,rs.length,closed));
+      if(closed) hidden+=rs.length; else rs.forEach(r=>body.appendChild(r));
+    });
   } else vis.forEach(r=>body.appendChild(r));
   emptyEl.hidden = total>0;
-  countEl.textContent = `showing ${vis.length} of ${total} matched · ${items.length} in feed`;
+  const collapsedHere=groupNames.filter(n=>state.collapsed.has(n));
+  countEl.textContent = `showing ${vis.length-hidden} of ${total} matched`
+    + (hidden ? ` · ${hidden} collapsed` : '') + ` · ${items.length} in feed`;
   groupBtn.classList.toggle('on', state.group);
+  collapseBtn.hidden = !state.group;
+  collapseBtn.textContent = collapsedHere.length ? 'expand all' : 'collapse all';
   save();
 }
 
 q.addEventListener('input',render);
 [showSel,sortSel,langSel].forEach(el=>el.addEventListener('change',render));
 groupBtn.addEventListener('click',()=>{state.group=!state.group;render();});
+collapseBtn.addEventListener('click',()=>{
+  // Only act on groups currently on screen, so "collapse all" can't strand a
+  // stale name in the persisted set and leave the button stuck on "expand all".
+  const names=[...new Set(items.filter(matches).map(r=>r.dataset.primary||'other'))];
+  if(names.some(n=>state.collapsed.has(n))) names.forEach(n=>state.collapsed.delete(n));
+  else names.forEach(n=>state.collapsed.add(n));
+  render();});
 document.querySelectorAll('button[data-src]').forEach(b=>b.addEventListener('click',()=>{
   const v=b.dataset.src, on=state.src===v;
   document.querySelectorAll('button[data-src]').forEach(x=>x.classList.remove('on'));

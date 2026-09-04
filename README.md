@@ -109,12 +109,19 @@ it works opened from disk with no server:
 | search | `/` focuses it, `Esc` clears |
 | show | 25 / 50 / 100 / 250 / all |
 | sort | curated (redundancy-filtered), score, velocity, newest, stars |
-| group by theme | sections ordered by best score, `other` last |
+| group by theme | **on by default**; sections ordered by best score, `other` last |
+| collapse a group | click its header (or `Enter`/`Space` when focused) |
+| collapse all / expand all | acts on the groups currently matching your filters |
 | theme chips | multi-select, matches any |
 | source chips + lang | single-select |
 | theme toggle | light / dark / follow system |
 
-Choices persist in `localStorage`. The markdown digest is grouped by theme too.
+Collapsed groups stay as a one-line header with their item count, and the
+counter breaks out how many rows are hidden that way. Choices persist in
+`localStorage`, including which groups you left collapsed — all storage access
+is guarded, so the page still works where storage is unavailable (a `file://`
+or `data:` context, or a browser blocking site data). The markdown digest is
+grouped by theme too.
 
 Items are filed under one theme by the explicit priority order in
 `radar/themes.py`. That list is deliberately dumb — an earlier version picked
