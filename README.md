@@ -101,6 +101,20 @@ Tune the weights in `config.toml`, then `radar rank` — no network, instant.
 
 ## The dashboard
 
+A snapshot of a real run is committed at [`docs/index.html`](docs/index.html)
+(1,491 items tracked, 250 in the feed), with the matching markdown digest at
+[`docs/digest.md`](docs/digest.md) — that one renders directly on GitHub. The
+HTML needs downloading or GitHub Pages to view, since GitHub shows raw `.html`
+as source.
+
+Refresh the snapshot with:
+
+```bash
+.\radar.cmd report --no-open && cp out/index.html docs/ && cp out/digest-*.md docs/digest.md
+```
+
+`out/` itself stays gitignored so ordinary runs don't dirty the tree.
+
 `out/index.html` is a single static file — everything below is client-side, so
 it works opened from disk with no server:
 
