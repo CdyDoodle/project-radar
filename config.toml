@@ -133,7 +133,12 @@ users = [
 
 [sources.github_search]
 enabled = true
-created_within_days = 240
+# Widening this brings older repos into the corpus, but `freshness` has a
+# 45-day half-life, so anything near the edge of the window scores ~0.004 there
+# and has to earn its place on velocity, fit and depth instead. That is usually
+# the right behaviour: an old repo still gaining stars fast is interesting, an
+# old quiet one is not.
+created_within_days = 365
 min_stars = 120
 per_query = 40
 # Each query is combined with the created/stars filters above.
