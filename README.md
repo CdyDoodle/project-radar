@@ -212,6 +212,20 @@ Judge changes here on **both** numbers, never coverage alone.
 trailing `|` leaves an empty alternative that silently tags the entire corpus,
 and it *improves* every coverage metric while doing so, so it hides.
 
+**READMEs are not read for classification.** A README mentions everything a
+project touches — install steps (`docker`, `cargo`, env vars), platform support
+(`Linux kernel`, CUDA, Vulkan), the whole feature tour — so including it flipped
+the primary theme of a third of enriched items to something wrong: Audacity
+filed under `os-kernel` for the words "operating system", a document converter
+under `wasm`, a video editor under `virtualization` for "container". Dropping it
+cost zero coverage, because every enriched item is a repo that already has a
+description and topics. Title, description and topics are what a maintainer
+chose to say the project *is*, which is exactly the signal wanted.
+
+This only shows up after `enrich` has run, and only on the top-ranked items —
+i.e. precisely the rows anyone actually looks at. A corpus-wide average hides
+it completely.
+
 ## How the briefs work
 
 Two passes, because a per-item summariser can only ever say "reimplement this".

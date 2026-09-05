@@ -184,13 +184,24 @@ def classify(text: str) -> set[str]:
 def of_item(item) -> set[str]:
     """Themes for an Item.
 
-    README is included but truncated -- long docs mention everything and would
-    make every project match every theme. In practice only enriched items have
-    one, so title, description and topics carry nearly all of the signal.
+    The README is deliberately NOT read. A README mentions everything a project
+    touches -- install steps (docker, cargo, env vars), platform support (Linux
+    kernel, CUDA, Vulkan), the feature tour -- so including it flipped the
+    primary theme of a third of enriched items to something wrong: Audacity
+    filed under os-kernel for the words "operating system", a document
+    converter under wasm, a video editor under virtualization for "container".
+
+    It cost nothing to drop: every enriched item is a GitHub repo and already
+    has a description and topics, so coverage was identical at 13.8% either
+    way, while average tags on enriched items fell 4.25 -> 2.55.
+
+    Title, description and topics are what a maintainer chose to say the
+    project *is*. That is exactly the signal wanted here. (`enrich` still
+    fetches READMEs -- they are valuable context for the LLM ideation pass.)
     """
     text = " ".join([
         item.title or "", item.summary or "", " ".join(item.topics),
-        item.lang or "", (item.readme or "")[:1500],
+        item.lang or "",
     ])
     found = classify(text)
     if found:

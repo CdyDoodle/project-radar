@@ -71,10 +71,13 @@ def of_item(item) -> str:
 
     Topics count heavily -- `topic:mcp-server` or `topic:agent-framework` is a
     stronger declaration of intent than anything in a marketing description.
+
+    The README is deliberately excluded, for the same reason `themes.of_item`
+    excludes it: a document converter with no AI in it was read as an AI
+    application because its README said "agent to". See that docstring.
     """
     text = " ".join([
         item.title or "", item.summary or "", " ".join(item.topics),
-        (item.readme or "")[:1200],
     ])
     return classify_text(text)
 
