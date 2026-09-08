@@ -20,6 +20,18 @@ log = logging.getLogger("radar.sources.community")
 
 HN_ITEM = "https://news.ycombinator.com/item?id={}"
 
+_TAG = re.compile(r"<[^>]+>")
+
+
+def _plain(html: str | None) -> str:
+    """HN's story_text is HTML. Stored raw it renders as markup soup in the
+    dashboard -- anchor tags and &#x2F; entities inline in the description."""
+    if not html:
+        return ""
+    import html as _html
+    text = _TAG.sub(" ", html)
+    return re.sub(r"\s+", " ", _html.unescape(text)).strip()
+
 
 @register
 class HackerNews:
@@ -69,7 +81,7 @@ class HackerNews:
                     url=url,
                     title=title,
                     source=self.name,
-                    summary=(hit.get("story_text") or "")[:1500],
+                    summary=_plain(hit.get("story_text"))[:1500],
                     author=hit.get("author"),
                     created_at=created,
                     metrics={"hn_points": points, "hn_comments": comments,

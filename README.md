@@ -99,6 +99,33 @@ disable it under `[rank.diversify]`; `radar top --raw` shows pure score order.
 
 Tune the weights in `config.toml`, then `radar rank` — no network, instant.
 
+## Published dashboard
+
+A GitHub Actions workflow (`.github/workflows/radar.yml`) reruns the pipeline
+daily at 06:00 UTC and publishes to GitHub Pages:
+
+- **`/`** — the latest run
+- **`/archive/`** — every previous run, dated, newest first
+
+The page being replaced is what gets archived, so `/archive/` holds what was
+actually served rather than a re-render.
+
+Two decisions worth knowing:
+
+**The corpus lives on the `gh-pages` branch** as `radar.db`, restored at the
+start of each run. A cache would be simpler but is evictable, and losing it
+silently resets `first_seen` for everything — "new this run" would report the
+entire corpus, and the `seen_before` decay would stop working.
+
+**`gh-pages` keeps a single commit**, force-pushed each run. The dashboard plus
+the database is a few MB rewritten daily; keeping history would add that much
+per day forever. The archived files in the tree are the history worth keeping.
+
+The Claude passes run only when an `ANTHROPIC_API_KEY` repository secret is
+set. Without it the ranked feed, highlights and digest still publish.
+
+Trigger a run by hand from the Actions tab (`workflow_dispatch`).
+
 ## The dashboard
 
 A snapshot of a real run is committed at [`docs/index.html`](docs/index.html)

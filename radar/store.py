@@ -197,6 +197,31 @@ class Store:
             out.append(payload)
         return out
 
+    def run_started(self, run_id: str | None) -> str | None:
+        """ISO timestamp a run began, for 'what is new since then' queries.
+
+        Falls back to the newest run, so `radar report` on its own still has a
+        sensible boundary when no run id is passed.
+        """
+        if run_id:
+            row = self.conn.execute(
+                "SELECT started_at FROM runs WHERE id = ?", (run_id,)
+            ).fetchone()
+            if row:
+                return row["started_at"]
+        row = self.conn.execute(
+            "SELECT started_at FROM runs ORDER BY started_at DESC LIMIT 1"
+        ).fetchone()
+        return row["started_at"] if row else None
+
+    def count_since(self, since: str) -> int:
+        """Items first seen at or after `since` (an ISO timestamp)."""
+        row = self.conn.execute(
+            "SELECT COUNT(*) c FROM items WHERE first_seen >= ? AND status != 'dismissed'",
+            (since,),
+        ).fetchone()
+        return row["c"] if row else 0
+
     def latest_run(self) -> str | None:
         row = self.conn.execute(
             "SELECT id FROM runs ORDER BY started_at DESC LIMIT 1"

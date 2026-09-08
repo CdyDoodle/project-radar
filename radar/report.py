@@ -8,6 +8,7 @@ scheduled run rewrites it underneath.
 from __future__ import annotations
 
 import json
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
@@ -68,6 +69,40 @@ h2{font-size:13px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted
   font-size:13px}.kill b{color:var(--warn)}
 .srcs{margin-top:12px;font-size:12px;font-family:var(--mono);word-break:break-all}
 .srcs a{color:var(--muted)}
+
+/* ---- highlights ---- */
+.hl{border:1px solid var(--line);border-radius:8px;background:var(--panel);
+  margin-bottom:20px;overflow:hidden}
+.hl>summary{cursor:pointer;user-select:none;list-style:none;padding:13px 18px;
+  font-family:var(--mono);font-size:12px;text-transform:uppercase;
+  letter-spacing:.1em;color:var(--accent);font-weight:700;
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.hl>summary::-webkit-details-marker{display:none}
+.hl>summary:hover{background:var(--accent-soft)}
+.hl[open]>summary{border-bottom:1px solid var(--line)}
+.hl[open]>summary .chev{transform:rotate(0deg)}
+.hl:not([open])>summary .chev{transform:rotate(-90deg)}
+.hl .chev{display:inline-block;transition:transform .12s}
+.hl-stat{margin-left:auto;text-transform:none;letter-spacing:0;
+  color:var(--muted);font-weight:400}
+.hl-body{padding:4px 18px 18px;display:grid;grid-template-columns:1fr 1fr;gap:8px 26px}
+/* The UA hides non-summary children of a closed <details> with a display rule.
+   An author `display:grid` on .hl-body outranks it, so the panel stayed open
+   when toggled. Hide it explicitly. */
+.hl:not([open]) .hl-body{display:none}
+@media(max-width:760px){.hl-body{grid-template-columns:1fr}}
+.lane{padding-top:14px}
+.lane h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.09em;
+  color:var(--ink);font-family:var(--mono)}
+.lane h3 em{text-transform:none;letter-spacing:0;color:var(--muted);
+  font-style:normal;font-weight:400;display:block;margin-top:2px}
+.pick{padding:7px 0;border-bottom:1px dotted var(--line)}
+.pick:last-child{border-bottom:none}
+.pick-h{display:flex;gap:8px;align-items:baseline}
+.pick-h a{font-weight:600;font-size:14px;text-decoration:none}
+.pick-score{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.pick-sum{color:var(--muted);font-size:13px;margin:1px 0 3px}
+.pick-why{font-family:var(--mono);font-size:10px;color:var(--muted)}
 
 /* ---- control bar ---- */
 .bar{position:sticky;top:0;z-index:20;background:var(--bg);
@@ -133,6 +168,34 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
 
 {% if summary %}
 <div class="summary"><strong>Where the board is pointing.</strong> {{ summary }}</div>
+{% endif %}
+
+{% if highlights %}
+<details class="hl" id="hl" open>
+  <summary><span class="chev">&#9662;</span> Worth a look
+    <span class="hl-stat">{{ mix.new }} new &middot; {{ mix.infra }} AI infra &middot;
+      {{ mix.applied }} AI applied &middot; {{ mix.nonai }} no AI</span></summary>
+  <div class="hl-body">
+  {% for lane in highlights %}
+    <section class="lane">
+      <h3>{{ lane.title }} <em>{{ lane.note }}</em></h3>
+      {% for it in lane['items'] %}
+      <div class="pick">
+        <div class="pick-h">
+          <a href="{{ it.url }}">{{ it.title }}</a>
+          <span class="pick-score">{{ '%.2f'|format(it.score) }}</span>
+        </div>
+        {% if it.summary %}<div class="pick-sum">{{ it.summary[:150] }}</div>{% endif %}
+        <div class="pick-why">
+          <span class="tag ax">{{ it.axis }}</span><span class="tag th">{{ it.theme }}</span>
+          {{ it.reason }}
+        </div>
+      </div>
+      {% endfor %}
+    </section>
+  {% endfor %}
+  </div>
+</details>
 {% endif %}
 
 {% if briefs %}
@@ -258,10 +321,11 @@ try{ const s=JSON.parse(localStorage.getItem('radar-prefs')||'{}');
   // Explicit undefined check: a stored `false` must survive a `true` default.
   if(s.group!==undefined) state.group=!!s.group;
   if(Array.isArray(s.collapsed)) state.collapsed=new Set(s.collapsed);
+  if(s.hl!==undefined && $('#hl')) $('#hl').open=!!s.hl;
 }catch(e){}
 function save(){ try{ localStorage.setItem('radar-prefs', JSON.stringify({
   show:showSel.value, sort:sortSel.value, lang:langSel.value, group:state.group,
-  collapsed:[...state.collapsed]}));
+  collapsed:[...state.collapsed], hl:$('#hl')?$('#hl').open:true}));
 }catch(e){} }
 
 const num=(r,k)=>parseFloat(r.dataset[k])||0;
@@ -344,6 +408,7 @@ function render(){
   save();
 }
 
+if($('#hl')) $('#hl').addEventListener('toggle',save);
 q.addEventListener('input',render);
 [showSel,sortSel,langSel].forEach(el=>el.addEventListener('change',render));
 groupBtn.addEventListener('click',()=>{state.group=!state.group;render();});
@@ -404,6 +469,95 @@ def _metrics_line(metrics: dict) -> str:
     return "  ".join(bits)
 
 
+def _reason(item, sources: list[str], is_new: bool) -> str:
+    """Why this item is worth a glance, built from signals already computed.
+
+    Deterministic on purpose: the briefs section needs an API key, and the
+    summary at the top of the page should still say something useful without
+    one.
+    """
+    bits = []
+    if is_new:
+        bits.append("new this run")
+    m = item.metrics
+    if m.get("stars_per_day"):
+        bits.append(f"{m['stars_per_day']}/day")
+    if m.get("stars"):
+        bits.append(f"{int(m['stars']):,} stars")
+    if m.get("hn_points"):
+        bits.append(f"{int(m['hn_points'])} HN points")
+    if m.get("starred_by"):
+        bits.append("starred by " + ", ".join(m["starred_by"][:3]))
+    if len(sources) > 1:
+        bits.append(f"{len(sources)} sources agree")
+    if m.get("arxiv_category"):
+        bits.append(m["arxiv_category"])
+    return " · ".join(bits)
+
+
+def _highlights(store: Store, cfg: Config, since: str | None,
+                per_lane: int = 4) -> list[dict]:
+    """A few small lanes, each answering a different question.
+
+    One ranked list cannot say "this is moving fast" and "several sources
+    independently agree" and "someone whose taste you trust starred this" at
+    once -- those are different reasons to look, and collapsing them into a
+    single score is exactly what loses the reason.
+    """
+    from radar import axis, themes
+
+    pool = store.items(limit=400)
+    prepared = []
+    for row in pool:
+        item = store.to_item(row)
+        prepared.append({
+            "row": row, "item": item,
+            "sources": sorted(item.sources),
+            "is_new": bool(since and (row["first_seen"] or "") >= since),
+        })
+
+    def entry(p) -> dict:
+        item = p["item"]
+        return {
+            "title": item.title, "url": item.url,
+            "summary": (item.summary or "").strip(),
+            "score": p["row"]["score"],
+            "axis": axis.label(axis.of_item(item)),
+            "theme": themes.primary(themes.of_item(item)),
+            "reason": _reason(item, p["sources"], p["is_new"]),
+        }
+
+    used: set[str] = set()
+
+    def take(candidates, n=per_lane):
+        out = []
+        for p in candidates:
+            key = p["row"]["id"]
+            if key in used:
+                continue
+            used.add(key)
+            out.append(entry(p))
+            if len(out) >= n:
+                break
+        return out
+
+    by_score = sorted(prepared, key=lambda p: -p["row"]["score"])
+    lanes = [
+        ("New this run", "highest-scoring things that were not here last time",
+         take([p for p in by_score if p["is_new"]])),
+        ("Moving fastest", "star velocity against the rest of the corpus",
+         take(sorted([p for p in prepared if p["item"].metrics.get("stars_per_day")],
+                     key=lambda p: -p["item"].metrics["stars_per_day"]))),
+        ("Several sources agree", "independent corroboration is the strongest signal here",
+         take([p for p in by_score if len(p["sources"]) > 1])),
+        ("From your watchlist", "engineers whose taste you chose to borrow",
+         take([p for p in by_score if p["item"].metrics.get("starred_by")])),
+        ("Papers, usually with no implementation", "where the gap is the project",
+         take([p for p in by_score if p["row"]["key"].startswith("arxiv:")])),
+    ]
+    return [{"title": t, "note": n, "items": i} for t, n, i in lanes if i]
+
+
 def _rows(store: Store, cfg: Config, limit: int) -> list[dict]:
     """Feed rows in curated (redundancy-filtered) order.
 
@@ -444,6 +598,16 @@ def build(cfg: Config, store: Store, run_id: str | None = None,
     run_id = run_id or store.latest_run() or "adhoc"
     briefs = store.briefs(run_id=run_id) or store.briefs(limit=int(cfg.get("brief.count", 8)))
     rows = _rows(store, cfg, feed_limit)
+    since = store.run_started(run_id)
+    highlights = _highlights(store, cfg, since)
+    counts_axis = Counter(r["axis"] for r in rows)
+    mix = {
+        # "new" counts the whole run, not just what reached the highlights.
+        "new": store.count_since(since) if since else 0,
+        "infra": counts_axis.get("ai-infra", 0),
+        "applied": counts_axis.get("ai-application", 0),
+        "nonai": counts_axis.get("non-ai", 0),
+    }
     source_names = sorted({s for r in rows for s in r["sources"]})
     theme_names = sorted({t for r in rows for t in r["themes"]})
     languages = sorted({r["lang"] for r in rows if r["lang"]})
@@ -457,17 +621,33 @@ def build(cfg: Config, store: Store, run_id: str | None = None,
         source_names=source_names, theme_names=theme_names, languages=languages,
         axes=[(a, axis.label(a)) for a in axis.ALL_AXES],
         stats=stats, summary=(briefs[0].get("board_summary") if briefs else ""),
+        highlights=highlights, mix=mix,
     )
     html_path = cfg.out_dir / "index.html"
     html_path.write_text(html, encoding="utf-8")
 
     md_path = cfg.out_dir / f"digest-{datetime.now():%Y-%m-%d}.md"
-    md_path.write_text(_markdown(briefs, rows, generated), encoding="utf-8")
+    md_path.write_text(_markdown(briefs, rows, generated, highlights, mix), encoding="utf-8")
     return html_path, md_path
 
 
-def _markdown(briefs: list[dict], rows: list[dict], generated: str) -> str:
+def _markdown(briefs: list[dict], rows: list[dict], generated: str,
+              highlights: list[dict] | None = None, mix: dict | None = None) -> str:
     L = [f"# radar digest - {generated}", ""]
+    if mix:
+        L += [f"`{mix['new']} new` · `{mix['infra']} AI infra` · "
+              f"`{mix['applied']} AI applied` · `{mix['nonai']} no AI`", ""]
+    if highlights:
+        L += ["<details open>", "<summary><b>Worth a look</b></summary>", ""]
+        for lane in highlights:
+            L += [f"### {lane['title']}", f"*{lane['note']}*", ""]
+            for it in lane["items"]:
+                L.append(f"- **[{it['title'].replace('|', chr(92) + '|')}]({it['url']})** "
+                         f"`{it['score']:.2f}` — {it['reason']}")
+                if it["summary"]:
+                    L.append(f"  <br>{it['summary'][:150]}")
+            L.append("")
+        L += ["</details>", "", "---", ""]
     if briefs and briefs[0].get("board_summary"):
         L += ["> " + briefs[0]["board_summary"], ""]
     if briefs:

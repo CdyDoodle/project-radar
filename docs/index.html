@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>radar - 2026-09-07 21:43</title>
+<title>radar - 2026-09-07 21:50</title>
 <style>
 :root{
   --bg:#fbfaf8; --panel:#fff; --ink:#1a1a19; --muted:#6b6a67; --line:#e6e3dd;
@@ -47,6 +47,40 @@ h2{font-size:13px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted
   font-size:13px}.kill b{color:var(--warn)}
 .srcs{margin-top:12px;font-size:12px;font-family:var(--mono);word-break:break-all}
 .srcs a{color:var(--muted)}
+
+/* ---- highlights ---- */
+.hl{border:1px solid var(--line);border-radius:8px;background:var(--panel);
+  margin-bottom:20px;overflow:hidden}
+.hl>summary{cursor:pointer;user-select:none;list-style:none;padding:13px 18px;
+  font-family:var(--mono);font-size:12px;text-transform:uppercase;
+  letter-spacing:.1em;color:var(--accent);font-weight:700;
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.hl>summary::-webkit-details-marker{display:none}
+.hl>summary:hover{background:var(--accent-soft)}
+.hl[open]>summary{border-bottom:1px solid var(--line)}
+.hl[open]>summary .chev{transform:rotate(0deg)}
+.hl:not([open])>summary .chev{transform:rotate(-90deg)}
+.hl .chev{display:inline-block;transition:transform .12s}
+.hl-stat{margin-left:auto;text-transform:none;letter-spacing:0;
+  color:var(--muted);font-weight:400}
+.hl-body{padding:4px 18px 18px;display:grid;grid-template-columns:1fr 1fr;gap:8px 26px}
+/* The UA hides non-summary children of a closed <details> with a display rule.
+   An author `display:grid` on .hl-body outranks it, so the panel stayed open
+   when toggled. Hide it explicitly. */
+.hl:not([open]) .hl-body{display:none}
+@media(max-width:760px){.hl-body{grid-template-columns:1fr}}
+.lane{padding-top:14px}
+.lane h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.09em;
+  color:var(--ink);font-family:var(--mono)}
+.lane h3 em{text-transform:none;letter-spacing:0;color:var(--muted);
+  font-style:normal;font-weight:400;display:block;margin-top:2px}
+.pick{padding:7px 0;border-bottom:1px dotted var(--line)}
+.pick:last-child{border-bottom:none}
+.pick-h{display:flex;gap:8px;align-items:baseline}
+.pick-h a{font-weight:600;font-size:14px;text-decoration:none}
+.pick-score{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.pick-sum{color:var(--muted);font-size:13px;margin:1px 0 3px}
+.pick-why{font-family:var(--mono);font-size:10px;color:var(--muted)}
 
 /* ---- control bar ---- */
 .bar{position:sticky;top:0;z-index:20;background:var(--bg);
@@ -104,12 +138,288 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
 <header>
   <div>
     <h1>radar<span>.</span></h1>
-    <div class="sub">2026-09-07 21:43 &middot; 2066 tracked &middot;
+    <div class="sub">2026-09-07 21:50 &middot; 2066 tracked &middot;
       250 in feed &middot; 0 briefs</div>
   </div>
   <button id="theme-toggle" title="toggle light/dark">theme</button>
 </header>
 
+
+
+
+<details class="hl" id="hl" open>
+  <summary><span class="chev">&#9662;</span> Worth a look
+    <span class="hl-stat">279 new &middot; 75 AI infra &middot;
+      100 AI applied &middot; 75 no AI</span></summary>
+  <div class="hl-body">
+  
+    <section class="lane">
+      <h3>New this run <em>highest-scoring things that were not here last time</em></h3>
+      
+      <div class="pick">
+        <div class="pick-h">
+          <a href="https://anubis.techaro.lol/blog/2026/anubis-wasm/">It took a year to ship WebAssembly in Anubis</a>
+          <span class="pick-score">3.08</span>
+        </div>
+        
+        <div class="pick-why">
+          <span class="tag ax">no AI</span><span class="tag th">wasm</span>
+          new this run · 351 HN points · 2 sources agree
+        </div>
+      </div>
+      
+      <div class="pick">
+        <div class="pick-h">
+          <a href="https://austinhenley.com/blog/python1024.html">Making a Python interpreter in 1024 bytes</a>
+          <span class="pick-score">2.83</span>
+        </div>
+        
+        <div class="pick-why">
+          <span class="tag ax">no AI</span><span class="tag th">compilers-pl</span>
+          new this run · 311 HN points · 2 sources agree
+        </div>
+      </div>
+      
+      <div class="pick">
+        <div class="pick-h">
+          <a href="https://github.com/redhat-et/ripwire">redhat-et/ripwire</a>
+          <span class="pick-score">2.43</span>
+        </div>
+        <div class="pick-sum">The ripgrep of AI context: a zero-dependency C++23 CLI + MCP server giving coding agents a ranked, deterministic map of any repo, blast radius, tests-</div>
+        <div class="pick-why">
+          <span class="tag ax">AI applied</span><span class="tag th">ai-agents</span>
+          new this run · 35.85/day · 1,453 stars
+        </div>
+      </div>
+      
+      <div class="pick">
+        <div class="pick-h">
+          <a href="https://arxiv.org/abs/2609.03344">LLMs as a Cognitive Virus</a>
+          <span class="pick-score">2.31</span>
+        </div>
+        
+        <div class="pick-why">
+          <span class="tag ax">AI applied</span><span class="tag th">other</span>
+          new this run · 392 HN points
+        </div>
+      </div>
+      
+    </section>
+  
+    <section class="lane">
+      <h3>Moving fastest <em>star velocity against the rest of the corpus</em></h3>
+      
+      <div class="pick">
+        <div class="pick-h">
+          <a href="https://github.com/deepseek-ai/deepseek-harness">deepseek-ai/deepseek-harness</a>
+          <span class="pick-score">1.95</span>
+        </div>
+        <div class="pick-sum">DeepSeek Harness: Everything is a Plugin.</div>
+        <div class="pick-why">
+          <span class="tag ax">AI applied</span><span class="tag th">other</span>
+          8380.46/day · 215,366 stars · starred by ggerganov
+        </div>
+      </div>
+      
+      <div class="pick">
+        <div class="pick-h">
+          <a href="https://github.com/firecrawl/anydoc">firecrawl/anydoc</a>
+          <span class="pick-score">3.28</span>
+        </div>
+        <div class="pick-sum">Convert Word, PowerPoint, Excel, OpenDocument, RTF, EPUB, CSV, and PDF to clean Markdown. Built in Rust, with Node.js and Python bindings.</div>
+        <div class="pick-why">
+          <span class="tag ax">no AI</span><span class="tag th">data-eng</span>
+          583.23/day · 20,707 stars · starred by simonw
+        </div>
+      </div>
+      
+      <div class="pick">
+        <div class="pick-h">
+          <a href="https://github.com/xai-org/grok-build">xai-org/grok-build</a>
+          <span class="pick-score">3.17</span>
+        </div>
+        <div class="pick-sum">SpaceXAI&#39;s coding agent harness and TUI. Fullscreen, mouse interactive, extensible.</div>
+        <div class="pick-why">
+          <span class="tag ax">AI infra</span><span class="tag th">devtools</span>
+          479.64/day · 26,553 stars · starred by simonw
+        </div>
+      </div>
+      
+      <div class="pick">
+        <div class="pick-h">
+          <a href="https://github.com/JustVugg/colibri">JustVugg/colibri</a>
+          <span class="pick-score">2.26</span>
+        </div>
+        <div class="pick-sum">Run frontier MoE models on hardware you already own — pure C, zero deps, experts streamed from disk. Tiny engine, immense model. 🐦</div>
+        <div class="pick-why">
+          <span class="tag ax">AI infra</span><span class="tag th">llm-inference</span>
+          393.61/day · 27,032 stars · starred by geohot
+        </div>
+      </div>
+      
+    </section>
+  
+    <section class="lane">
+      <h3>Several sources agree <em>independent corroboration is the strongest signal here</em></h3>
+      
+      <div class="pick">
+        <div class="pick-h">
+          <a href="https://github.com/ddalcu/mlx-serve">ddalcu/mlx-serve</a>
+          <span class="pick-score">3.60</span>
+        </div>
+        <div class="pick-sum">Native LLM inference server for Apple Silicon. OpenAI + Anthropic API compatible. No Python. Includes MLX Core macOS app with chat, agent mode, and to</div>
+        <div class="pick-why">
+          <span class="tag ax">AI infra</span><span class="tag th">llm-inference</span>
+          5.71/day · 1,159 stars · starred by simonw · 3 sources agree
+        </div>
+      </div>
+      
+      <div class="pick">
+        <div class="pick-h">
+          <a href="https://github.com/zedeus/nitter">Following legal advice, the Nitter project will continue</a>
+          <span class="pick-score">2.53</span>
+        </div>
+        <div class="pick-sum">https://github.com/zedeus/nitter https://xcancel.com/cdclegal https://nitter.net/ https://xcancel.com/</div>
+        <div class="pick-why">
+          <span class="tag ax">no AI</span><span class="tag th">other</span>
+          899 HN points · 2 sources agree
+        </div>
+      </div>
+      
+      <div class="pick">
+        <div class="pick-h">
+          <a href="https://github.com/mixelpixx/Konnect">mixelpixx/Konnect</a>
+          <span class="pick-score">2.50</span>
+        </div>
+        <div class="pick-sum">AI-assisted PCB design for KiCAD 10. Native KiCAD plugin — a single Rust binary exposing 217 schematic, layout, routing, placement, design-review, and</div>
+        <div class="pick-why">
+          <span class="tag ax">AI applied</span><span class="tag th">ai-agents</span>
+          8.17/day · 525 stars · 2 sources agree
+        </div>
+      </div>
+      
+      <div class="pick">
+        <div class="pick-h">
+          <a href="https://github.com/1jehuang/jcode">1jehuang/jcode</a>
+          <span class="pick-score">2.47</span>
+        </div>
+        <div class="pick-sum">The most RAM efficient harness</div>
+        <div class="pick-why">
+          <span class="tag ax">AI applied</span><span class="tag th">devtools</span>
+          78.58/day · 19,314 stars · 2 sources agree
+        </div>
+      </div>
+      
+    </section>
+  
+    <section class="lane">
+      <h3>From your watchlist <em>engineers whose taste you chose to borrow</em></h3>
+      
+      <div class="pick">
+        <div class="pick-h">
+          <a href="https://github.com/sqliteai/warp">sqliteai/warp</a>
+          <span class="pick-score">3.45</span>
+        </div>
+        <div class="pick-sum">Run the full 2.78-trillion-parameter Kimi K3 model or GLM-5.3-Flash beyond available RAM by streaming activated weights directly from NVMe. A dependen</div>
+        <div class="pick-why">
+          <span class="tag ax">AI infra</span><span class="tag th">llm-inference</span>
+          57.42/day · 2,373 stars · starred by karpathy
+        </div>
+      </div>
+      
+      <div class="pick">
+        <div class="pick-h">
+          <a href="https://github.com/handy-computer/transcribe.cpp">handy-computer/transcribe.cpp</a>
+          <span class="pick-score">3.37</span>
+        </div>
+        <div class="pick-sum">ggml speech-to-text inference for 16+ model families</div>
+        <div class="pick-why">
+          <span class="tag ax">AI infra</span><span class="tag th">llm-inference</span>
+          12.35/day · 1,899 stars · starred by ggerganov, simonw
+        </div>
+      </div>
+      
+      <div class="pick">
+        <div class="pick-h">
+          <a href="https://github.com/antirez/ds4">antirez/ds4</a>
+          <span class="pick-score">3.29</span>
+        </div>
+        <div class="pick-sum">DeepSeek 4 Flash and PRO local inference engine for Metal, CUDA and ROCm</div>
+        <div class="pick-why">
+          <span class="tag ax">AI infra</span><span class="tag th">llm-inference</span>
+          181.71/day · 22,082 stars · starred by simonw
+        </div>
+      </div>
+      
+      <div class="pick">
+        <div class="pick-h">
+          <a href="https://github.com/rivet-dev/agentos">rivet-dev/agentos</a>
+          <span class="pick-score">3.10</span>
+        </div>
+        <div class="pick-sum">Give agents an operating system as a library. Runs in your existing backend – no sandboxes, VMs, or SaaS. Powered by WebAssembly &amp; V8 isolates.</div>
+        <div class="pick-why">
+          <span class="tag ax">AI infra</span><span class="tag th">os-kernel</span>
+          4.87/day · 4,601 stars · starred by simonw
+        </div>
+      </div>
+      
+    </section>
+  
+    <section class="lane">
+      <h3>Papers, usually with no implementation <em>where the gap is the project</em></h3>
+      
+      <div class="pick">
+        <div class="pick-h">
+          <a href="http://arxiv.org/abs/2608.27790v1">Credo: Reusable Declarative Primitives for Agentic Workflows</a>
+          <span class="pick-score">2.44</span>
+        </div>
+        <div class="pick-sum">An LLM application depends on both a model and a harness: the program that determines what each call sees, how many calls to make, and which answers t</div>
+        <div class="pick-why">
+          <span class="tag ax">AI infra</span><span class="tag th">compilers-pl</span>
+          cs.DB
+        </div>
+      </div>
+      
+      <div class="pick">
+        <div class="pick-h">
+          <a href="http://arxiv.org/abs/2609.03844v1">Flip, Don&#39;t Shuffle: Watermarking LLMs at the Speed of Inference</a>
+          <span class="pick-score">2.33</span>
+        </div>
+        <div class="pick-sum">We introduce Stateless Bernoulli Watermarking (SBW), a new statistical watermark for Large Language Models that determines green list membership throu</div>
+        <div class="pick-why">
+          <span class="tag ax">AI applied</span><span class="tag th">gpu-hpc</span>
+          cs.LG
+        </div>
+      </div>
+      
+      <div class="pick">
+        <div class="pick-h">
+          <a href="http://arxiv.org/abs/2608.28963v1">RENSA: Rich Environment Metadata to Navigate Shared and Distributed Endpoints for Automated Federated SPARQL Query Generation</a>
+          <span class="pick-score">2.30</span>
+        </div>
+        <div class="pick-sum">The number of knowledge graph databases has increased significantly with the proliferation of knowledge graph technologies. Knowledge graphs enable th</div>
+        <div class="pick-why">
+          <span class="tag ax">AI applied</span><span class="tag th">llm-inference</span>
+          cs.DB
+        </div>
+      </div>
+      
+      <div class="pick">
+        <div class="pick-h">
+          <a href="http://arxiv.org/abs/2608.25061v2">DataKernelBench: Can LLMs Optimize Database Queries on GPUs?</a>
+          <span class="pick-score">2.27</span>
+        </div>
+        <div class="pick-sum">GPUs increasingly accelerate database systems, but query-specific peak performance still often relies on hand-written kernels. Existing LLM kernel ben</div>
+        <div class="pick-why">
+          <span class="tag ax">AI applied</span><span class="tag th">gpu-hpc</span>
+          cs.PL
+        </div>
+      </div>
+      
+    </section>
+  
+  </div>
+</details>
 
 
 
@@ -559,7 +869,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
 </tr>
 
 <tr class="item"
-    data-text="following legal advice, the nitter project will continue &lt;a href=&#34;https:&amp;#x2f;&amp;#x2f;github.com&amp;#x2f;zedeus&amp;#x2f;nitter&#34; rel=&#34;nofollow&#34;&gt;https:&amp;#x2f;&amp;#x2f;github.com&amp;#x2f;zedeus&amp;#x2f;nitter&lt;/a&gt;&lt;p&gt;&lt;a href=&#34;https:&amp;#x2f;&amp;#x2f;xcancel.com&amp;#x2f;cdclegal&#34; rel=&#34;nofollow&#34;&gt;https:&amp;#x2f;&amp;#x2f;xcancel.com&amp;#x2f;cdclegal&lt;/a&gt;&lt;p&gt;&lt;a href=&#34;https:&amp;#x2f;&amp;#x2f;nitter.net&amp;#x2f;&#34; rel=&#34;nofollow&#34;&gt;https:&amp;#x2f;&amp;#x2f;nitter.net&amp;#x2f;&lt;/a&gt;&lt;p&gt;&lt;a href=&#34;https:&amp;#x2f;&amp;#x2f;xcancel.com&amp;#x2f;&#34; rel=&#34;nofollow&#34;&gt;https:&amp;#x2f;&amp;#x2f;xcancel.com&amp;#x2f;&lt;/a&gt; nim culture privacy web "
+    data-text="following legal advice, the nitter project will continue https://github.com/zedeus/nitter https://xcancel.com/cdclegal https://nitter.net/ https://xcancel.com/ nim culture privacy web "
     data-sources="hackernews lobsters"
     data-themes=""
     data-primary="other" data-axis="non-ai"
@@ -570,7 +880,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
   <td class="score">2.53</td>
   <td>
     <a href="https://github.com/zedeus/nitter"><strong>Following legal advice, the Nitter project will continue</strong></a>
-    <span class="desc">&lt;a href=&#34;https:&amp;#x2F;&amp;#x2F;github.com&amp;#x2F;zedeus&amp;#x2F;nitter&#34; rel=&#34;nofollow&#34;&gt;https:&amp;#x2F;&amp;#x2F;github.com&amp;#x2F;zedeus&amp;#x2F;nitter&lt;/a&gt;&lt;p&gt;&lt;a href=&#34;https:&amp;#x2F;&amp;#x2F;xcancel.com&amp;#x2F;cdclegal&#34;</span>
+    <span class="desc">https://github.com/zedeus/nitter https://xcancel.com/cdclegal https://nitter.net/ https://xcancel.com/</span>
     <span class="tag ax">no AI</span>
     <span class="tag">Nim</span>
     
@@ -1153,7 +1463,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
     data-primary="compilers-pl" data-axis="ai-application"
     data-lang="C"
     data-score="2.2031743594414723" data-vel="0.766"
-    data-age="203.7" data-stars="1736"
+    data-age="203.8" data-stars="1736"
     data-curated="47">
   <td class="score">2.20</td>
   <td>
@@ -1426,7 +1736,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
     data-primary="llm-inference" data-axis="ai-application"
     data-lang="Swift"
     data-score="2.1068107123178605" data-vel="0.918"
-    data-age="49.5" data-stars="1407"
+    data-age="49.6" data-stars="1407"
     data-curated="60">
   <td class="score">2.11</td>
   <td>
@@ -1441,7 +1751,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
 </tr>
 
 <tr class="item"
-    data-text="show hn: we built open openrouter that turns usage into a better model hi hn, we built an open source model gateway. it&amp;#x27;s a single place to manage our own self hosted, frontier, and open source models in one place.&lt;p&gt;it’s is rust native, built for concurrency, and implements all the config quirks across models and providers (streaming formats, tool calls, model parameters, rate limits, and different error behavior).&lt;p&gt;the gateway adds under 1 ms for byok requests and under 2 ms when experiential supplies the provider key. it has every major inference provider, and 1000+ models refreshed daily via a codex agent that opens a pr.&lt;p&gt;compared to other similar projects we’re open source, take no markup, allow you to mix local models with a marketplace, and use your traffic to (opt in) train you a model. simple routing doesn’t warrant a 10% token markup.&lt;p&gt;the way we do this is given standardized otel traces, we mine representative real tasks, use text world models to simulate rollouts for various models, apply an llm judge, and fit a nearest neighbor classifier on top of an embedding of a prompt to decide the optimal model for each request. usually this can map out a better pareto curve on cost&amp;#x2f;quality than just calling single models but it’s not perfect.&lt;p&gt;using these simulations we can also do things like suggesting cache hit optimizations, new model suggestions, and training models.&lt;p&gt;it’s open source, so you can deploy it on your own infrastructure, use our hosted version with 0 markup, or read how we design for maximum availability on o   ai-agents concurrency ml-research"
+    data-text="show hn: we built open openrouter that turns usage into a better model hi hn, we built an open source model gateway. it&#39;s a single place to manage our own self hosted, frontier, and open source models in one place. it’s is rust native, built for concurrency, and implements all the config quirks across models and providers (streaming formats, tool calls, model parameters, rate limits, and different error behavior). the gateway adds under 1 ms for byok requests and under 2 ms when experiential supplies the provider key. it has every major inference provider, and 1000+ models refreshed daily via a codex agent that opens a pr. compared to other similar projects we’re open source, take no markup, allow you to mix local models with a marketplace, and use your traffic to (opt in) train you a model. simple routing doesn’t warrant a 10% token markup. the way we do this is given standardized otel traces, we mine representative real tasks, use text world models to simulate rollouts for various models, apply an llm judge, and fit a nearest neighbor classifier on top of an embedding of a prompt to decide the optimal model for each request. usually this can map out a better pareto curve on cost/quality than just calling single models but it’s not perfect. using these simulations we can also do things like suggesting cache hit optimizations, new model suggestions, and training models. it’s open source, so you can deploy it on your own infrastructure, use our hosted version with 0 markup, or read how we design for maximum availability on o   ai-agents concurrency ml-research"
     data-sources="hackernews"
     data-themes="ai-agents concurrency ml-research"
     data-primary="concurrency" data-axis="ai-infra"
@@ -1452,7 +1762,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
   <td class="score">2.08</td>
   <td>
     <a href="https://github.com/experientiallabs/experiential"><strong>Show HN: We built open OpenRouter that turns usage into a better model</strong></a>
-    <span class="desc">Hi HN, we built an open source model gateway. It&amp;#x27;s a single place to manage our own self hosted, frontier, and open source models in one place.&lt;p&gt;It’s is rust native, built for concurre</span>
+    <span class="desc">Hi HN, we built an open source model gateway. It&#39;s a single place to manage our own self hosted, frontier, and open source models in one place. It’s is rust native, built for concurrency, an</span>
     <span class="tag ax">AI infra</span>
     
     <span class="tag th">ai-agents</span><span class="tag th">concurrency</span><span class="tag th">ml-research</span>
@@ -1846,7 +2156,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
     data-primary="llm-inference" data-axis="ai-infra"
     data-lang="Go"
     data-score="2.0100397307347504" data-vel="0.309"
-    data-age="351.4" data-stars="594"
+    data-age="351.5" data-stars="594"
     data-curated="80">
   <td class="score">2.01</td>
   <td>
@@ -2098,7 +2408,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
     data-primary="ai-agents" data-axis="ai-infra"
     data-lang=""
     data-score="1.982312621486383" data-vel="0.0"
-    data-age="8.9" data-stars="0"
+    data-age="9.0" data-stars="0"
     data-curated="92">
   <td class="score">1.98</td>
   <td>
@@ -2224,7 +2534,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
     data-primary="other" data-axis="non-ai"
     data-lang="Zig"
     data-score="1.967360671854351" data-vel="0.85"
-    data-age="243.4" data-stars="1104"
+    data-age="243.5" data-stars="1104"
     data-curated="98">
   <td class="score">1.97</td>
   <td>
@@ -2434,7 +2744,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
     data-primary="databases" data-axis="ai-application"
     data-lang="Rust"
     data-score="1.9297426945652858" data-vel="0.927"
-    data-age="141.0" data-stars="4910"
+    data-age="141.1" data-stars="4910"
     data-curated="108">
   <td class="score">1.93</td>
   <td>
@@ -2602,7 +2912,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
     data-primary="data-eng" data-axis="ai-application"
     data-lang=""
     data-score="1.895522613666547" data-vel="0.0"
-    data-age="5.3" data-stars="0"
+    data-age="5.4" data-stars="0"
     data-curated="116">
   <td class="score">1.90</td>
   <td>
@@ -2728,7 +3038,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
     data-primary="security" data-axis="ai-infra"
     data-lang="TypeScript"
     data-score="1.8716364691040202" data-vel="0.972"
-    data-age="196.9" data-stars="20980"
+    data-age="197.0" data-stars="20980"
     data-curated="122">
   <td class="score">1.87</td>
   <td>
@@ -3652,7 +3962,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
     data-primary="concurrency" data-axis="non-ai"
     data-lang=""
     data-score="1.7404229528839579" data-vel="0.0"
-    data-age="4.2" data-stars="0"
+    data-age="4.3" data-stars="0"
     data-curated="166">
   <td class="score">1.74</td>
   <td>
@@ -3862,7 +4172,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
     data-primary="compilers-pl" data-axis="ai-application"
     data-lang="Rust"
     data-score="1.7056584441024438" data-vel="0.62"
-    data-age="92.4" data-stars="412"
+    data-age="92.5" data-stars="412"
     data-curated="176">
   <td class="score">1.71</td>
   <td>
@@ -4261,7 +4571,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
     data-primary="other" data-axis="non-ai"
     data-lang=""
     data-score="1.6469358504134544" data-vel="0.511"
-    data-age="8.8" data-stars="0"
+    data-age="8.9" data-stars="0"
     data-curated="195">
   <td class="score">1.65</td>
   <td>
@@ -4276,7 +4586,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
 </tr>
 
 <tr class="item"
-    data-text="language models can control their own attention language models spend most of their attention on a small fraction of context, yet they read the entire kv cache to find the few tokens that matter. if the user asks about a previous detail in a 1m-token conversation, global attention layers must scan the full context to generate each token of the reply. a prominent approach mitigates this cost by pre-selecting relevant tokens via lightweight proxy scores, but this extrinsic scoring still incurs o(n) per step. we take an intrinsic approach motivated by the simple question: wouldn&#39;t the model already know which parts of the context are relevant? to this end, we introduce declarative attention (da), a protocol that elicits the model to declare where it needs to attend within its chain-of-thought, partitioning generation into three modes: &lt;global&gt; (full context), &lt;focus&gt; (a specific region), and &lt;local&gt; (recent output only). the inference engine parses these declarations like tool calls and skips most of the kv cache read. under zero-shot evaluation across 15 long-context tasks, da on off-the-shelf models (gemma-4-31b, qwen-3.6-27b) significantly reduces total attended tokens during decoding (52.0%, 31.1%) with modest accuracy drops (1.27pp, 2.75pp) that shrink with model scale. da unlocks a new axis of sparse attention, with further potential under training-based methods that future work can explore.  cs.lg ai-agents llm-inference networking"
+    data-text="language models can control their own attention language models spend most of their attention on a small fraction of context, yet they read the entire kv cache to find the few tokens that matter. if the user asks about a previous detail in a 1m-token conversation, global attention layers must scan the full context to generate each token of the reply. a prominent approach mitigates this cost by pre-selecting relevant tokens via lightweight proxy scores, but this extrinsic scoring still incurs o(n) per step. we take an intrinsic approach motivated by the simple question: wouldn&#39;t the model already know which parts of the context are relevant? to this end, we introduce declarative attention (da), a protocol that elicits the model to declare where it needs to attend within its chain-of-thought, partitioning generation into three modes: (full context), (a specific region), and (recent output only). the inference engine parses these declarations like tool calls and skips most of the kv cache read. under zero-shot evaluation across 15 long-context tasks, da on off-the-shelf models (gemma-4-31b, qwen-3.6-27b) significantly reduces total attended tokens during decoding (52.0%, 31.1%) with modest accuracy drops (1.27pp, 2.75pp) that shrink with model scale. da unlocks a new axis of sparse attention, with further potential under training-based methods that future work can explore.  cs.lg ai-agents llm-inference networking"
     data-sources="arxiv"
     data-themes="ai-agents llm-inference networking"
     data-primary="llm-inference" data-axis="ai-infra"
@@ -4507,7 +4817,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
 </tr>
 
 <tr class="item"
-    data-text="show hn: termy – a fast terminal assistant that does not use llms i love research and development, you may have heard of me because of pjon (padded jittering operative network). it is a network protocol i started developing in 2010, which was recently implemented in silicon by the eth zurich university thanks to the research of pius sieber.&lt;p&gt;i am excited to share with you termy, a terminal assistant built on top of the npc-forge framework. unlike everything else being built today, termy does not use embeddings, machine-learning or llms. it runs on the cpu (even on a raspberry pi zero) both in the terminal or client-side in a browser tab and responds in milliseconds. it is a cynical but very knowledgeable linux terminal assistant that translates your natural language into shell commands without relying on a single artificial neuron.&lt;p&gt;i had a chance to focus for 2 months on my personal projects since early july, during the strange times of ai price hikes and the end of subsidized tokenmaxing. i was curious to see if i could develop from scratch a terminal assistant capable of handling simple natural language requests. i have a bad memory and got used to ask to copilot &amp;quot;activate the virtual environment&amp;quot; or similar trivial operations spending a non negligible sum every month. i started thinking, maybe i can do something to make my workflow more efficient? do i really need trillions of parameters to accomplish those tasks?&lt;p&gt;how it works&lt;p&gt;when you type a prompt, it goes through a lightweight nlu pipeline written in ~1000 lines of py   ai-agents devtools embedded-hw ml-research networking web"
+    data-text="show hn: termy – a fast terminal assistant that does not use llms i love research and development, you may have heard of me because of pjon (padded jittering operative network). it is a network protocol i started developing in 2010, which was recently implemented in silicon by the eth zurich university thanks to the research of pius sieber. i am excited to share with you termy, a terminal assistant built on top of the npc-forge framework. unlike everything else being built today, termy does not use embeddings, machine-learning or llms. it runs on the cpu (even on a raspberry pi zero) both in the terminal or client-side in a browser tab and responds in milliseconds. it is a cynical but very knowledgeable linux terminal assistant that translates your natural language into shell commands without relying on a single artificial neuron. i had a chance to focus for 2 months on my personal projects since early july, during the strange times of ai price hikes and the end of subsidized tokenmaxing. i was curious to see if i could develop from scratch a terminal assistant capable of handling simple natural language requests. i have a bad memory and got used to ask to copilot &#34;activate the virtual environment&#34; or similar trivial operations spending a non negligible sum every month. i started thinking, maybe i can do something to make my workflow more efficient? do i really need trillions of parameters to accomplish those tasks? how it works when you type a prompt, it goes through a lightweight nlu pipeline written in ~1000 lines of py   ai-agents devtools embedded-hw ml-research networking web"
     data-sources="hackernews"
     data-themes="ai-agents devtools embedded-hw ml-research networking web"
     data-primary="embedded-hw" data-axis="ai-application"
@@ -4534,7 +4844,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
     data-primary="theory" data-axis="ai-infra"
     data-lang=""
     data-score="1.5819625178199794" data-vel="0.0"
-    data-age="3.4" data-stars="0"
+    data-age="3.5" data-stars="0"
     data-curated="208">
   <td class="score">1.58</td>
   <td>
@@ -4597,7 +4907,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
     data-primary="embedded-hw" data-axis="non-ai"
     data-lang=""
     data-score="1.5757497185474616" data-vel="0.0"
-    data-age="7.8" data-stars="0"
+    data-age="7.9" data-stars="0"
     data-curated="211">
   <td class="score">1.58</td>
   <td>
@@ -4828,7 +5138,7 @@ kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--line);
     data-primary="embedded-hw" data-axis="non-ai"
     data-lang=""
     data-score="1.5550625956304913" data-vel="0.0"
-    data-age="5.3" data-stars="0"
+    data-age="5.4" data-stars="0"
     data-curated="222">
   <td class="score">1.56</td>
   <td>
@@ -5434,10 +5744,11 @@ try{ const s=JSON.parse(localStorage.getItem('radar-prefs')||'{}');
   // Explicit undefined check: a stored `false` must survive a `true` default.
   if(s.group!==undefined) state.group=!!s.group;
   if(Array.isArray(s.collapsed)) state.collapsed=new Set(s.collapsed);
+  if(s.hl!==undefined && $('#hl')) $('#hl').open=!!s.hl;
 }catch(e){}
 function save(){ try{ localStorage.setItem('radar-prefs', JSON.stringify({
   show:showSel.value, sort:sortSel.value, lang:langSel.value, group:state.group,
-  collapsed:[...state.collapsed]}));
+  collapsed:[...state.collapsed], hl:$('#hl')?$('#hl').open:true}));
 }catch(e){} }
 
 const num=(r,k)=>parseFloat(r.dataset[k])||0;
@@ -5520,6 +5831,7 @@ function render(){
   save();
 }
 
+if($('#hl')) $('#hl').addEventListener('toggle',save);
 q.addEventListener('input',render);
 [showSel,sortSel,langSel].forEach(el=>el.addEventListener('change',render));
 groupBtn.addEventListener('click',()=>{state.group=!state.group;render();});

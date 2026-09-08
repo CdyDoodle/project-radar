@@ -1,0 +1,122 @@
+name: radar
+
+# Reruns the pipeline, publishes the new dashboard to GitHub Pages, and keeps
+# every previous run as a dated snapshot under /archive/.
+on:
+  schedule:
+    # 06:00 UTC daily. GitHub queues scheduled runs under load, so treat the
+    # time as approximate.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Never let two runs publish at once; they would race on the gh-pages branch.
+concurrency:
+  group: radar-publish
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out the tool
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Fetch the published site (carries the corpus forward)
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            git clone --branch gh-pages --single-branch --depth 1 \
+              "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" site
+            echo "restored existing site"
+          else
+            mkdir -p site
+            echo "no gh-pages yet, starting fresh"
+          fi
+          mkdir -p site/archive
+          # radar.db lives on the branch so the corpus (first_seen, dismissals,
+          # the seen_before decay) survives across runs. A cache would be
+          # evictable, and losing it silently resets "new this run" to
+          # everything.
+          if [ -f site/radar.db ]; then
+            cp site/radar.db radar.db
+            echo "corpus restored: $(du -h radar.db | cut -f1)"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run radar
+        env:
+          # radar reads GITHUB_TOKEN for the GitHub API (5000 req/hr).
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -euo pipefail
+          # The Claude passes only run when the secret is present; without it
+          # the ranked feed and highlights still publish.
+          if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "ANTHROPIC_API_KEY present - generating briefs"
+            python -m radar run --no-open
+          else
+            echo "no ANTHROPIC_API_KEY - skipping the LLM passes"
+            python -m radar run --no-open --no-llm
+          fi
+
+      - name: Publish new snapshot and archive the old one
+        run: |
+          set -euo pipefail
+          STAMP="$(date -u +%Y-%m-%d-%H%M)"
+          # The page being replaced becomes the archived one, so /archive/
+          # holds what was actually served rather than a re-render.
+          if [ -f site/index.html ]; then
+            cp site/index.html "site/archive/${STAMP}.html"
+            echo "archived previous page as ${STAMP}.html"
+          fi
+          cp out/index.html site/index.html
+          cp "$(ls -t out/digest-*.md | head -1)" site/digest.md
+          cp radar.db site/radar.db
+          # Pages would otherwise run the tree through Jekyll and drop
+          # underscore-prefixed paths.
+          touch site/.nojekyll
+          python scripts/build_archive_index.py site/archive
+
+      - name: Push to gh-pages
+        run: |
+          set -euo pipefail
+          cd site
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "radar snapshot $(date -u +%Y-%m-%dT%H:%MZ)"
+          # Single-commit history on purpose. The dashboard and the database
+          # are a few MB and rewritten every run; keeping history would add
+          # that much per day forever. The archive files in the tree are the
+          # history worth keeping.
+          git push -f -q \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            gh-pages
+          echo "published"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          {
+            echo "### radar published"
+            echo ""
+            echo "- site: https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/"
+            echo "- archive: https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/archive/"
+            echo "- snapshots kept: $(ls -1 site/archive/*.html 2>/dev/null | grep -vc 'index.html$' || echo 0)"
+            echo "- corpus: $(du -h site/radar.db 2>/dev/null | cut -f1 || echo n/a)"
+          } >> "$GITHUB_STEP_SUMMARY"
