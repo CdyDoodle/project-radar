@@ -142,17 +142,34 @@ def find_claude(cfg: Config) -> str | None:
     on_path = shutil.which("claude")
     if on_path:
         return on_path
-    appdata = os.environ.get("APPDATA")
-    if appdata:
-        bundled = glob.glob(os.path.join(appdata, "Claude", "claude-code", "*", "claude.exe"))
-
+    bundled = bundled_claude_paths()
+    if bundled:
         def version(path: str) -> tuple:
             name = Path(path).parent.name
             return tuple(int(p) if p.isdigit() else 0 for p in name.split("."))
-
-        if bundled:
-            return max(bundled, key=version)
+        return max(bundled, key=version)
     return None
+
+
+def bundled_claude_paths() -> list[str]:
+    """Copies of claude.exe that ship with the Claude desktop app on Windows.
+
+    The Store/MSIX build redirects the app's %APPDATA% into its package
+    folder. Only the app's own processes see the redirected path; a normal
+    terminal must look inside LocalAppData\\Packages\\Claude_*\\LocalCache.
+    Both places are searched so radar works from either.
+    """
+    roots = []
+    if os.environ.get("APPDATA"):
+        roots.append(os.path.join(os.environ["APPDATA"], "Claude", "claude-code"))
+    if os.environ.get("LOCALAPPDATA"):
+        roots += glob.glob(os.path.join(os.environ["LOCALAPPDATA"], "Packages", "Claude_*",
+                                        "LocalCache", "Roaming", "Claude", "claude-code"))
+    found = []
+    for root in roots:
+        found += [p for p in glob.glob(os.path.join(root, "*", "claude.exe"))
+                  if os.path.isfile(p)]
+    return found
 
 
 def _child_env() -> dict:

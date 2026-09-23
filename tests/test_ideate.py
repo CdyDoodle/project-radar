@@ -123,6 +123,19 @@ def test_chinese_language_rule_reaches_the_prompt(store, cfg, fake):
     assert "简体中文" in args[args.index("--system-prompt") + 1]
 
 
+def test_finds_the_desktop_apps_packaged_copy(tmp_path, monkeypatch, cfg):
+    # A normal terminal sees the MSIX package folder, not the redirected APPDATA.
+    pkg = tmp_path / "Local" / "Packages" / "Claude_abc123" / "LocalCache" / "Roaming"
+    for ver in ("2.1.9", "2.1.280"):
+        exe = pkg / "Claude" / "claude-code" / ver / "claude.exe"
+        exe.parent.mkdir(parents=True)
+        exe.write_bytes(b"")
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "Local"))
+    monkeypatch.setenv("APPDATA", str(tmp_path / "Roaming-empty"))
+    monkeypatch.setattr(ideate.shutil, "which", lambda name: None)
+    assert ideate.find_claude(cfg).endswith("2.1.280" + __import__("os").sep + "claude.exe")
+
+
 def test_api_key_is_withheld(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
     monkeypatch.setenv("CLAUDECODE", "1")
