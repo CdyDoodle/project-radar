@@ -35,6 +35,7 @@ from radar.config import Config
 from radar.store import Store
 
 BRANCH = "gh-pages"
+DB_FILES = ("radar.db", "radar.db-wal", "radar.db-shm")
 
 
 class PublishError(RuntimeError):
@@ -80,6 +81,26 @@ def pages_url(remote: str) -> str | None:
     if repo.lower() == f"{owner.lower()}.github.io":
         return f"https://{owner.lower()}.github.io/"
     return f"https://{owner.lower()}.github.io/{repo}/"
+
+
+def branch_exists(remote: str, attempts: int = 2) -> bool:
+    """Whether the remote has a gh-pages branch.
+
+    Only `ls-remote` exit code 2 means "no such branch". Anything else is a
+    failure to ask -- network, credentials -- and treating that as "absent"
+    publishes over the live site from scratch and drops its archive. That
+    happened once; so fail loudly instead.
+    """
+    for _ in range(attempts):
+        code = _git("ls-remote", "--exit-code", "--heads", remote, BRANCH,
+                    check=False).returncode
+        if code == 0:
+            return True
+        if code == 2:
+            return False
+    raise PublishError(
+        f"could not check {remote} for a {BRANCH} branch (git exit {code}); "
+        "nothing was published. Check your network and git credentials.")
 
 
 def _rmtree(path: Path) -> None:
@@ -135,9 +156,7 @@ def publish(cfg: Config, store: Store, *, remote: str | None = None,
     tmp = Path(tempfile.mkdtemp(prefix="radar-publish-"))
     site = tmp / "site"
     try:
-        has_branch = _git("ls-remote", "--exit-code", "--heads", remote, BRANCH,
-                          check=False).returncode == 0
-        if has_branch:
+        if branch_exists(remote):
             _git("clone", "--quiet", "--branch", BRANCH, "--single-branch", "--depth", "1",
                  remote, str(site))
             _rmtree(site / ".git")        # start a fresh, parentless history
@@ -155,13 +174,21 @@ def publish(cfg: Config, store: Store, *, remote: str | None = None,
 
         shutil.copy2(page, site / "index.html")
         shutil.copy2(digests[-1], site / "digest.md")
+        # Opening the old published db (the guard above) can leave -wal/-shm
+        # files behind. A stale WAL beside a new db corrupts it when both are
+        # opened together, so clear all three before writing.
+        for name in DB_FILES:
+            (site / name).unlink(missing_ok=True)
         # The backup API gives a consistent copy even with WAL pages pending.
-        (site / "radar.db").unlink(missing_ok=True)
         dst = sqlite3.connect(site / "radar.db")
         try:
             store.conn.backup(dst)
+            # Copied page 1 carries WAL mode; publish a self-contained file.
+            dst.execute("PRAGMA journal_mode=DELETE")
         finally:
             dst.close()
+        for name in DB_FILES[1:]:
+            (site / name).unlink(missing_ok=True)
         (site / ".nojekyll").touch()
         plan.snapshots = archive.build(site / "archive")
 
