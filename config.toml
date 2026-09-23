@@ -34,6 +34,7 @@ thesis that can be falsified early.
 "kernel" = 0.8
 "runtime" = 0.8
 "agent" = 0.8
+"agentic" = 0.8
 "llm" = 0.7
 "cuda" = 0.9
 "gpu" = 0.8
