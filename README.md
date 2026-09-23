@@ -58,6 +58,9 @@ Run it whenever you want a fresh look. Nothing is scheduled.
 | `hackernews` | Front page + Show HN above a point threshold |
 | `lobsters` | Systems/PL-skewed, far less noise than HN |
 | `arxiv` | Recent papers in your categories — usually with no implementation yet |
+| `github_activity` | What the watched engineers **build**: their own pushes, new repos, releases |
+| `hf_papers` | Hugging Face daily papers — gives arXiv papers an upvote count |
+| `bluesky` | Posts linking to a repo or paper, via the public search API. Off by default: it refuses some networks with a 403 |
 
 Everything is deduped onto a canonical key, so an HN thread, a Lobsters post and
 a trending entry that all point at one repo collapse into a single item — and

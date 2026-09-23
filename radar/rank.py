@@ -93,7 +93,7 @@ def _text_of(item: Item) -> str:
     ]).lower()
 
 
-VELOCITY_METRICS = ("stars_per_day", "hn_points", "lobsters_score")
+VELOCITY_METRICS = ("stars_per_day", "hn_points", "lobsters_score", "hf_upvotes", "bsky_likes")
 
 
 class Corpus:
@@ -126,7 +126,8 @@ class Corpus:
 
 
 # Fallback ceilings, used only when the corpus is too small to form a distribution.
-FALLBACK_CEILING = {"stars_per_day": 120, "hn_points": 700, "lobsters_score": 60}
+FALLBACK_CEILING = {"stars_per_day": 120, "hn_points": 700, "lobsters_score": 60,
+                    "hf_upvotes": 150, "bsky_likes": 200}
 
 
 def velocity(item: Item, corpus: Corpus | None = None) -> float:
@@ -150,8 +151,9 @@ def corroboration(item: Item) -> float:
 
 
 def watchlist(item: Item) -> float:
-    watchers = item.metrics.get("starred_by") or []
-    n = len(watchers)
+    """Watched engineers who starred it, or are building it themselves."""
+    people = set(item.metrics.get("starred_by") or []) | set(item.metrics.get("worked_on_by") or [])
+    n = len(people)
     return 0.0 if n == 0 else 1 - 0.55 ** n
 
 

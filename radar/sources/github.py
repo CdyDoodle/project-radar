@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections import defaultdict
 from datetime import timedelta
 
 from bs4 import BeautifulSoup
@@ -49,6 +50,7 @@ def _repo_item(repo: dict, source: str, evidence: str) -> Item | None:
         "stars_per_day": round(stars / age_days, 2) if age_days else None,
         "days_since_push": round((now() - pushed).total_seconds() / 86400, 1) if pushed else None,
         "archived": bool(repo.get("archived")),
+        "fork": bool(repo.get("fork")),
     }
     return Item(
         key=f"gh:{full.lower()}",
@@ -241,6 +243,85 @@ class GitHubStarred:
                     break
             log.info("github_starred @%s -> running total %d", user, len(items))
         return items
+
+
+@register
+class GitHubActivity:
+    """What the engineers on your watchlist are building themselves.
+
+    Their stars show taste; their own pushes, new repos and releases show
+    work. A new repo from someone whose judgement you trust is a stronger
+    signal than anything a trending page can produce.
+    """
+
+    name = "github_activity"
+    EVENTS = {"PushEvent", "CreateEvent", "ReleaseEvent", "PublicEvent"}
+
+    def fetch(self, cfg: Config, http: Http) -> list[Item]:
+        conf = cfg.get("sources.github_activity", {}) or {}
+        users = cfg.watchlist
+        if not users:
+            return []
+        window = int(conf.get("within_days", 30))
+        pages = int(conf.get("pages_per_user", 1))
+        own_only = bool(conf.get("own_repos_only", True))
+        cutoff = now() - timedelta(days=window)
+
+        seen: dict[str, dict] = {}
+        for user in users:
+            for page in range(1, pages + 1):
+                data = http.gh(f"/users/{user}/events/public",
+                               params={"per_page": 100, "page": page})
+                if not isinstance(data, list) or not data:
+                    break
+                stopped = False
+                for ev in data:
+                    when = _parse_dt(ev.get("created_at"))
+                    if when and when < cutoff:
+                        stopped = True      # newest first
+                        break
+                    if ev.get("type") not in self.EVENTS:
+                        continue
+                    if ev["type"] == "CreateEvent" and (ev.get("payload") or {}).get("ref_type") != "repository":
+                        continue            # branches and tags are not new projects
+                    full = (ev.get("repo") or {}).get("name") or ""
+                    if not full or (own_only and not full.lower().startswith(user.lower() + "/")):
+                        continue
+                    rec = seen.setdefault(full.lower(), {
+                        "full": full, "users": set(), "kinds": defaultdict(int), "latest": when})
+                    rec["users"].add(user)
+                    rec["kinds"][ev["type"]] += 1
+                    if when and (rec["latest"] is None or when > rec["latest"]):
+                        rec["latest"] = when
+                if stopped or len(data) < 100:
+                    break
+            log.info("github_activity @%s -> running total %d repos", user, len(seen))
+
+        items = []
+        for rec in seen.values():
+            full, kinds = rec["full"], rec["kinds"]
+            bits = []
+            if kinds.get("CreateEvent"):
+                bits.append("created it")
+            if kinds.get("PushEvent"):
+                bits.append(f"pushed {kinds['PushEvent']}x")
+            if kinds.get("ReleaseEvent"):
+                bits.append(f"released {kinds['ReleaseEvent']}x")
+            if kinds.get("PublicEvent"):
+                bits.append("made it public")
+            who = ", ".join("@" + u for u in sorted(rec["users"]))
+            latest = f" (latest {rec['latest']:%Y-%m-%d})" if rec["latest"] else ""
+            items.append(Item(
+                key=f"gh:{full.lower()}", url=f"https://github.com/{full}", title=full,
+                source=self.name, author=full.split("/")[0],
+                metrics={"worked_on_by": sorted(rec["users"]),
+                         "activity_events": sum(kinds.values())},
+                evidence=[f"{who} {', '.join(bits)}{latest}"],
+            ))
+        items = hydrate(http, items, workers=int(conf.get("hydrate_workers", 8)))
+        # A fork someone pushed to is their contribution to another project,
+        # not a project of theirs.
+        return [it for it in items if not it.metrics.get("fork")]
 
 
 def fetch_readme(http: Http, repo: str, max_chars: int = 8000) -> str:

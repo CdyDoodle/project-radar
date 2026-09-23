@@ -217,6 +217,35 @@ within_days = 21
 per_category = 40
 categories = ["cs.LG", "cs.PL", "cs.DC", "cs.OS", "cs.DB", "cs.AR"]
 
+[sources.github_activity]
+# What the watched engineers are building themselves: their own pushes, new
+# repos and releases (same users as github_starred). Their stars show taste;
+# their work shows what they think is worth doing. Forks are ignored.
+enabled = true
+within_days = 30
+pages_per_user = 1
+own_repos_only = true
+
+[sources.hf_papers]
+# Hugging Face daily papers. arXiv itself carries no popularity signal, so
+# papers could only rank on fit and freshness; these merge onto the same
+# paper and bring an upvote count.
+enabled = true
+days = 7
+per_day = 50
+
+[sources.bluesky]
+# Posts linking to a repo or paper, via the public search API (no account).
+# Off by default: the API refuses some networks outright (HTTP 403,
+# "forbidden by administrative rules"). Enable it, run `radar fetch`, and
+# keep it if it answers. Queries default to your interest terms.
+enabled = false
+within_days = 14
+min_likes = 5
+per_query = 50
+domains = ["github.com", "arxiv.org"]
+# queries = ["inference engine", "compiler", "database internals"]
+
 ####################################################################
 # Ideation, through Claude Code
 #

@@ -54,7 +54,7 @@ def canonical_key(url: str) -> str:
 # replaces the stored one; everything else accumulates (see Item.carry_forward).
 SNAPSHOT_METRICS = frozenset({
     "stars", "forks", "open_issues", "age_days", "stars_per_day",
-    "days_since_push", "archived", "stars_today", "stars_this_week",
+    "days_since_push", "archived", "fork", "stars_today", "stars_this_week",
 })
 MAX_EVIDENCE = 12
 

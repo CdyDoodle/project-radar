@@ -209,3 +209,140 @@ class Arxiv:
                 ))
             log.info("arxiv %s -> running total %d", cat, len(items))
         return items
+
+
+@register
+class HFPapers:
+    """Hugging Face daily papers: arXiv papers with an upvote count.
+
+    arXiv itself carries no popularity signal, so papers could only rank on
+    fit and freshness. These merge onto the same `arxiv:` key and give the
+    ranker a velocity number for them. The listing also links the GitHub
+    repo when one exists.
+    """
+
+    name = "hf_papers"
+    URL = "https://huggingface.co/api/daily_papers"
+
+    def fetch(self, cfg: Config, http: Http) -> list[Item]:
+        conf = cfg.get("sources.hf_papers", {}) or {}
+        days = int(conf.get("days", 7))
+        limit = int(conf.get("per_day", 50))
+        items: list[Item] = []
+        for back in range(days):
+            day = (now() - timedelta(days=back)).date().isoformat()
+            data = http.json(self.URL, params={"date": day, "limit": limit})
+            if not isinstance(data, list):
+                continue
+            for entry in data:
+                paper = entry.get("paper") or {}
+                pid = str(paper.get("id") or "").strip()
+                if not pid:
+                    continue
+                url = f"https://arxiv.org/abs/{pid}"
+                upvotes = int(paper.get("upvotes") or 0)
+                published = None
+                stamp = paper.get("publishedAt") or entry.get("publishedAt")
+                if stamp:
+                    try:
+                        published = datetime.fromisoformat(
+                            stamp.replace("Z", "+00:00")).astimezone(UTC)
+                    except ValueError:
+                        pass
+                authors = [a.get("name", "") for a in paper.get("authors") or [] if a.get("name")]
+                metrics: dict = {"hf_upvotes": upvotes,
+                                 "hf_comments": int(entry.get("numComments") or 0)}
+                if paper.get("githubRepo"):
+                    metrics["hf_github_repo"] = paper["githubRepo"]
+                items.append(Item(
+                    key=canonical_key(url), url=url,
+                    title=re.sub(r"\s+", " ", paper.get("title") or entry.get("title") or "").strip(),
+                    source=self.name,
+                    summary=re.sub(r"\s+", " ", paper.get("summary") or entry.get("summary") or "")[:2500],
+                    author=", ".join(authors[:4]) + (" et al." if len(authors) > 4 else ""),
+                    created_at=published,
+                    metrics=metrics,
+                    evidence=[f"Hugging Face daily papers {day}: {upvotes} upvotes"],
+                ))
+            log.info("hf_papers %s -> running total %d", day, len(items))
+        return items
+
+
+@register
+class Bluesky:
+    """Posts on Bluesky that link to a repo or a paper.
+
+    The X substitute: engineering threads point at code, and the public
+    search endpoint can filter posts by the domain they link to. Off by
+    default -- the public API refuses some networks outright (HTTP 403 with
+    "forbidden by administrative rules"), so enable it and run `radar fetch`
+    once to see whether it answers from yours.
+    """
+
+    name = "bluesky"
+    URL = "https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts"
+
+    def fetch(self, cfg: Config, http: Http) -> list[Item]:
+        conf = cfg.get("sources.bluesky", {}) or {}
+        queries = conf.get("queries") or list(cfg.interests)[:12]
+        domains = conf.get("domains") or ["github.com", "arxiv.org"]
+        min_likes = int(conf.get("min_likes", 5))
+        limit = min(int(conf.get("per_query", 50)), 100)
+        since = (now() - timedelta(days=int(conf.get("within_days", 14)))).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        items: list[Item] = []
+        for q in queries:
+            for domain in domains:
+                data = http.json(self.URL, params={"q": q, "domain": domain, "sort": "top",
+                                                   "since": since, "limit": limit})
+                if not isinstance(data, dict):
+                    continue
+                for post in data.get("posts") or []:
+                    likes = int(post.get("likeCount") or 0)
+                    if likes < min_likes:
+                        continue
+                    items.extend(self._items(post, likes))
+            log.info("bluesky %-24s -> running total %d", q, len(items))
+        from radar.sources.github import hydrate
+        return hydrate(http, items)
+
+    def _items(self, post: dict, likes: int) -> list[Item]:
+        record = post.get("record") or {}
+        links: list[tuple[str, str]] = []           # (url, title)
+        embed = post.get("embed") or {}
+        ext = embed.get("external") or {}
+        if ext.get("uri"):
+            links.append((ext["uri"], ext.get("title") or ""))
+        for facet in record.get("facets") or []:
+            for feat in facet.get("features") or []:
+                if str(feat.get("$type", "")).endswith("#link") and feat.get("uri"):
+                    links.append((feat["uri"], ""))
+        handle = (post.get("author") or {}).get("handle") or "?"
+        rkey = str(post.get("uri") or "").rsplit("/", 1)[-1]
+        post_url = f"https://bsky.app/profile/{handle}/post/{rkey}"
+        created = None
+        stamp = post.get("indexedAt") or record.get("createdAt")
+        if stamp:
+            try:
+                created = datetime.fromisoformat(stamp.replace("Z", "+00:00")).astimezone(UTC)
+            except ValueError:
+                pass
+        out, seen = [], set()
+        for url, title in links:
+            key = canonical_key(url)
+            if not (key.startswith("gh:") or key.startswith("arxiv:")) or key in seen:
+                continue
+            seen.add(key)
+            out.append(Item(
+                key=key, url=url,
+                title=title or (key[3:] if key.startswith("gh:") else url),
+                source=self.name,
+                summary=_plain(record.get("text"))[:500],
+                author=handle, created_at=created,
+                metrics={"bsky_likes": likes, "bsky_reposts": int(post.get("repostCount") or 0)},
+                # The post text is the reason a human shared it; keep it as
+                # evidence (hydration replaces summary with the repo's own).
+                evidence=[f"Bluesky: {likes} likes from @{handle}: "
+                          f"“{_plain(record.get('text'))[:140]}” ({post_url})"],
+            ))
+        return out
