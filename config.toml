@@ -67,6 +67,10 @@ forget_after_runs = 3
 # The seen_before penalty grows with each run that has already shown an item,
 # reaching its full weight after this many runs.
 seen_before_full_after_runs = 6
+# Hugging Face upvotes are a percentile among featured papers, which are
+# already a curated set, so a middling paper would look like a top-velocity
+# repo. Scaled down; at 1.0 papers took half the shortlist.
+paper_velocity_scale = 0.75
 
 [rank.diversify]
 # Redundancy control. Scoring ranks items independently, so N implementations of

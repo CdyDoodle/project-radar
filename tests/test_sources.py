@@ -113,3 +113,15 @@ def test_bluesky_turns_linked_posts_into_repo_and_paper_items(cfg):
     assert "check this out now" in repo.evidence[0]        # post text kept, html stripped
     assert "bsky.app/profile/eng.bsky.social/post/3k2f" in repo.evidence[0]
     assert repo.source == "bluesky" and repo.author == "alice"      # author = repo owner once hydrated
+
+
+def test_paper_velocity_is_scaled_down(cfg):
+    from tests.conftest import link, repo
+    from radar.store import Store
+    items = [repo(f"x/{i}", stars_per_day=10 + i) for i in range(10)]
+    papers = [link(f"https://arxiv.org/abs/2609.{i}", "p", source="hf_papers", hf_upvotes=10 + i)
+              for i in range(10)]
+    corpus = rank.Corpus(items + papers)
+    top_repo = rank.velocity(items[-1], corpus, cfg)
+    top_paper = rank.velocity(papers[-1], corpus, cfg)
+    assert top_repo == 0.9 and top_paper == 0.9 * 0.75

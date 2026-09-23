@@ -130,15 +130,21 @@ FALLBACK_CEILING = {"stars_per_day": 120, "hn_points": 700, "lobsters_score": 60
                     "hf_upvotes": 150, "bsky_likes": 200}
 
 
-def velocity(item: Item, corpus: Corpus | None = None) -> float:
+def velocity(item: Item, corpus: Corpus | None = None, cfg: Config | None = None) -> float:
     m = item.metrics
     parts = []
+    paper_scale = float(cfg.get("rank.paper_velocity_scale", 0.75)) if cfg else 0.75
     for name in VELOCITY_METRICS:
         raw = m.get(name) or 0
         if not raw:
             continue
         pct = corpus.percentile(name, raw) if corpus else None
-        parts.append(pct if pct is not None else _norm_log(raw, FALLBACK_CEILING[name]))
+        val = pct if pct is not None else _norm_log(raw, FALLBACK_CEILING[name])
+        if name == "hf_upvotes":
+            # A percentile among featured papers, which are already curated;
+            # unscaled, a middling paper outranks a genuinely fast repo.
+            val *= paper_scale
+        parts.append(val)
     if m.get("trending_windows"):
         parts.append(0.55 + 0.15 * len(m["trending_windows"]))
     return min(1.0, max(parts)) if parts else 0.0
@@ -280,7 +286,7 @@ def score_item(item: Item, cfg: Config, row=None,
     half_life = float(cfg.get("rank.freshness_half_life_days", 45))
 
     comps = {
-        "velocity": velocity(item, corpus),
+        "velocity": velocity(item, corpus, cfg),
         "corroboration": corroboration(item),
         "watchlist": watchlist(item),
         "fit": fit(item, cfg.interests),
