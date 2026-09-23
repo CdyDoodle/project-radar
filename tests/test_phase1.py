@@ -148,3 +148,15 @@ def test_depth_ignores_substrings():
     a = repo("x/a", "aircraft jitter draft", lang=None)
     b = repo("x/b", "raft jit", lang=None)
     assert rank.depth(a) < rank.depth(b)
+
+
+# -- source health -------------------------------------------------------------
+def test_source_health_flags_collapsed_sources():
+    from radar.collect import source_health
+    prev = {"hackernews": 180, "lobsters": 50, "arxiv": 200, "_raw": 1000}
+    now_ = {"hackernews": 0, "lobsters": 6, "arxiv": 190, "_raw": 400}
+    warnings = source_health(now_, prev)
+    assert any("hackernews returned nothing" in w for w in warnings)
+    assert any("lobsters returned 6 items, down from 50" in w for w in warnings)
+    assert not any("arxiv" in w for w in warnings)
+    assert source_health(now_, None) == []            # first run: nothing to compare

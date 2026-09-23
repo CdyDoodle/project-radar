@@ -406,6 +406,13 @@ class Store:
         )
         self.conn.commit()
 
+    def last_stats(self) -> dict | None:
+        """Per-source counts of the newest run that recorded any."""
+        row = self.conn.execute(
+            "SELECT stats FROM runs WHERE stats != '{}' ORDER BY started_at DESC LIMIT 1"
+        ).fetchone()
+        return json.loads(row["stats"]) if row else None
+
     def finish_run(self, run_id: str, stats: dict) -> None:
         self.conn.execute(
             "UPDATE runs SET stats = ? WHERE id = ?", (json.dumps(stats), run_id)

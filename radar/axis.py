@@ -82,5 +82,11 @@ def of_item(item) -> str:
     return classify_text(text)
 
 
-def label(axis: str) -> str:
-    return {INFRA: "AI infra", APPLICATION: "AI applied", NON_AI: "no AI"}.get(axis, axis)
+LABELS = {
+    "en": {INFRA: "AI infra", APPLICATION: "AI applied", NON_AI: "no AI"},
+    "zh": {INFRA: "AI 基础设施", APPLICATION: "AI 应用", NON_AI: "非 AI"},
+}
+
+
+def label(axis: str, lang: str = "en") -> str:
+    return LABELS.get(lang, LABELS["en"]).get(axis, axis)

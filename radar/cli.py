@@ -64,8 +64,11 @@ def cmd_init(args) -> int:
 
 def cmd_fetch(args) -> int:
     cfg, store = _open(config.load(args.home))
+    run_id = _run_id()
+    store.start_run(run_id)
     with console.status("fetching sources..."):
         stats = collect.collect(cfg, store)
+    store.finish_run(run_id, stats)
     table = Table(title="fetch", show_edge=False, header_style="dim")
     table.add_column("source"); table.add_column("items", justify="right")
     for k, v in stats.items():
@@ -74,7 +77,13 @@ def cmd_fetch(args) -> int:
     console.print(table)
     console.print(f"[dim]{stats['_raw']} raw -> {stats['_merged']} unique "
                   f"({stats['_collapsed']} cross-source duplicates collapsed)[/]")
+    _warn(stats)
     return 0
+
+
+def _warn(stats: dict) -> None:
+    for w in stats.get("_warnings", []):
+        console.print(f"[yellow]warning:[/] {w}")
 
 
 def cmd_rank(args) -> int:
@@ -162,6 +171,7 @@ def cmd_run(args) -> int:
         stats = collect.collect(cfg, store)
     console.print(f"[green]fetch[/]   {stats['_merged']} unique items "
                   f"({stats['_collapsed']} collapsed)")
+    _warn(stats)
 
     rank.rank_all(store, cfg)
     console.print("[green]rank[/]    scored")

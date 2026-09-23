@@ -8,3 +8,4 @@ __pycache__/
 *.pyc
 .audit/
 .pytest_cache/
+.claude/launch.json

@@ -250,6 +250,11 @@ timeout_seconds = 1200
 # desktop app on Windows.
 # claude_path = "C:/path/to/claude.exe"
 
+[report]
+# Default language of the dashboard and digest: "en" or "zh-CN". The page has
+# a toggle either way; this only picks what it shows first.
+language = "en"
+
 [storage]
 db = "radar.db"
 out_dir = "out"

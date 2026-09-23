@@ -65,7 +65,32 @@ def collect(cfg: Config, store: Store, http: Http | None = None) -> dict:
     stats["_merged"] = len(merged)
     stats["_collapsed"] = len(raw) - len(merged)
     stats["_run"] = seq
+    stats["_warnings"] = source_health(stats, store.last_stats())
+    for w in stats["_warnings"]:
+        log.warning(w)
     return stats
+
+
+def source_health(stats: dict, previous: dict | None) -> list[str]:
+    """Warn when a source collapses.
+
+    A scraper whose page changed, or an API that started refusing us, returns
+    nothing and the run still succeeds. Compare with the previous run's
+    counts: zero where there used to be items, or a drop below a fifth of
+    the previous count, is worth a line at the end of the run.
+    """
+    out = []
+    for name, n in stats.items():
+        if name.startswith("_"):
+            continue
+        before = (previous or {}).get(name)
+        if before is None or not isinstance(before, int) or before <= 0:
+            continue
+        if n == 0:
+            out.append(f"source {name} returned nothing (previous run: {before})")
+        elif n < before / 5:
+            out.append(f"source {name} returned {n} items, down from {before}")
+    return out
 
 
 def enrich(cfg: Config, store: Store, http: Http | None = None,

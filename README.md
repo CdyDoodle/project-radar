@@ -143,25 +143,15 @@ another machine, publishing would silently discard it. `--force` overrides.
 
 ## The dashboard
 
-A snapshot of a real run is committed at [`docs/index.html`](docs/index.html)
-(1,491 items tracked, 250 in the feed), with the matching markdown digest at
-[`docs/digest.md`](docs/digest.md) — that one renders directly on GitHub. The
-HTML needs downloading or GitHub Pages to view, since GitHub shows raw `.html`
-as source.
-
-Refresh the snapshot with:
-
-```bash
-.\radar.cmd report --no-open && cp out/index.html docs/ && cp out/digest-*.md docs/digest.md
-```
-
-`out/` itself stays gitignored so ordinary runs don't dirty the tree.
+The live page is at <https://cdydoodle.github.io/project-radar/>; `radar run`
+writes the same thing to `out/index.html`, which stays gitignored.
 
 `out/index.html` is a single static file — everything below is client-side, so
 it works opened from disk with no server:
 
 | Control | |
 |---|---|
+| language | English / 简体中文, top right; `report.language` sets the default |
 | search | `/` focuses it, `Esc` clears |
 | show | 25 / 50 / 100 / 250 / all |
 | sort | curated (redundancy-filtered), score, velocity, newest, stars |
@@ -170,7 +160,19 @@ it works opened from disk with no server:
 | collapse all / expand all | acts on the groups currently matching your filters |
 | theme chips | multi-select, matches any |
 | source chips + lang | single-select |
+| save / dismiss | hover a row; copies `radar save <key>` or `radar dismiss <key>` |
 | theme toggle | light / dark / follow system |
+
+Every interface string is rendered in both languages and swapped on the client,
+so the toggle needs no rebuild. Item titles and descriptions are never
+translated; they stay as their authors wrote them. Setting `brief.language`
+too makes the briefs themselves Chinese.
+
+The page is static, so save and dismiss can't write to the database; the
+buttons copy the command to run. "Worth a look" also has a **Saved** lane, and
+"Moving fastest" leaves out repos the `mega` penalty has already marked as
+famous. Briefs from earlier runs are kept in a collapsed **Earlier briefs**
+section.
 
 Collapsed groups stay as a one-line header with their item count, and the
 counter breaks out how many rows are hidden that way. Choices persist in
@@ -384,6 +386,10 @@ Before and after any change to scoring or patterns, compare the corpus numbers:
 
 Dismissed items never come back, and items that have sat in the feed across
 multiple runs decay, so the top of the list stays fresh.
+
+After each fetch, radar compares every source's count with the previous run
+and warns when one returned nothing or fell below a fifth of what it did
+before — a scraper whose page changed would otherwise fail silently.
 
 ## Adding a source
 

@@ -254,3 +254,22 @@ def primary(theme_set: set[str]) -> str:
         if name in theme_set:
             return name
     return sorted(theme_set)[0]
+
+
+# Display labels. The identifiers above stay English everywhere in the data;
+# only the dashboard and digest show these.
+LABELS_ZH = {
+    "llm-inference": "LLM 推理", "ai-agents": "AI 智能体", "ml-research": "机器学习研究",
+    "compilers-pl": "编译器与语言", "databases": "数据库", "distributed": "分布式系统",
+    "concurrency": "并发", "os-kernel": "操作系统内核", "embedded-hw": "嵌入式与硬件",
+    "virtualization": "虚拟化", "gpu-hpc": "GPU 与高性能计算", "security": "安全",
+    "networking": "网络", "observability": "可观测性", "emulation": "模拟器",
+    "version-control": "版本控制", "science-compute": "科学计算", "robotics": "机器人",
+    "theory": "理论", "data-eng": "数据工程", "graphics-media": "图形与媒体",
+    "ui-desktop": "桌面与界面", "wasm": "WebAssembly", "web": "Web", "devtools": "开发工具",
+    "industry": "行业动态", DISCUSSION: "讨论", UNCLASSIFIED: "其他",
+}
+
+
+def label(theme: str, lang: str = "en") -> str:
+    return LABELS_ZH.get(theme, theme) if lang == "zh" else theme

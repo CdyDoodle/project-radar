@@ -316,12 +316,25 @@ def rank_all(store, cfg: Config) -> list:
     return store.items(include_dismissed=False)
 
 
-def explain(breakdown: dict) -> str:
+# Display names for the score components and penalties, per language.
+COMPONENT_LABELS = {
+    "zh": {
+        "velocity": "热度", "corroboration": "多源印证", "watchlist": "关注列表",
+        "fit": "兴趣匹配", "freshness": "新鲜度", "depth": "技术深度",
+        "slop": "低质内容", "chatter": "无代码", "stale": "停更", "archived": "已归档",
+        "mega": "已成名", "seen_before": "已出现过", "low_substance": "内容空洞",
+        "shallow": "技术浅",
+    },
+}
+
+
+def explain(breakdown: dict, lang: str = "en") -> str:
     """One-line human summary of why something scored what it did."""
+    names = COMPONENT_LABELS.get(lang, {})
     contrib = breakdown.get("contributions", {})
     pens = breakdown.get("penalties", {})
     parts = sorted(contrib.items(), key=lambda kv: -kv[1])[:3]
-    text = ", ".join(f"{k} +{v:.2f}" for k, v in parts if v > 0.01)
+    text = ", ".join(f"{names.get(k, k)} +{v:.2f}" for k, v in parts if v > 0.01)
     if pens:
-        text += "  |  " + ", ".join(f"{k} {v:.2f}" for k, v in pens.items())
-    return text or "no signal"
+        text += "  |  " + ", ".join(f"{names.get(k, k)} {v:.2f}" for k, v in pens.items())
+    return text or ("无信号" if lang == "zh" else "no signal")
