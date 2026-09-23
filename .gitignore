@@ -1,8 +1,8 @@
 .venv/
 .cache/
 out/
-radar.db
-radar.db-wal
-radar.db-shm
+# Every local copy of the corpus, including dated backups. The published
+# database lives on the gh-pages branch, never in main.
+radar.db*
 __pycache__/
 *.pyc
