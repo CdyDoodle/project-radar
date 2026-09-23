@@ -401,7 +401,7 @@ class Store:
 
     def start_run(self, run_id: str) -> None:
         self.conn.execute(
-            "INSERT OR REPLACE INTO runs (id, started_at) VALUES (?, ?)",
+            "INSERT OR IGNORE INTO runs (id, started_at) VALUES (?, ?)",
             (run_id, now().isoformat()),
         )
         self.conn.commit()

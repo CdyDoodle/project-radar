@@ -141,3 +141,13 @@ def test_migration_backfills_runs_from_history(tmp_path):
     assert (early["last_fetch"], early["runs_seen"]) == (1, 1)
     Store(path)                                    # reopening is a no-op
     assert Store(path).schema_version == 1
+
+
+def test_starting_an_existing_run_keeps_its_start_and_stats(store):
+    # `radar brief --run <id>` calls start_run on a run that already exists.
+    store.start_run("r1")
+    first = store.conn.execute("SELECT started_at FROM runs WHERE id='r1'").fetchone()[0]
+    store.finish_run("r1", {"_merged": 10})
+    store.start_run("r1")
+    row = store.conn.execute("SELECT started_at, stats FROM runs WHERE id='r1'").fetchone()
+    assert row[0] == first and json.loads(row[1]) == {"_merged": 10}
