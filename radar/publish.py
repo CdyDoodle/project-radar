@@ -53,6 +53,7 @@ class Plan:
     files: dict[str, int] = field(default_factory=dict)   # path -> bytes
     archived_as: str | None = None
     snapshots: int = 0
+    thinned: list[str] = field(default_factory=list)   # archived pages removed
     remote_runs: int = 0
     pushed: bool = False
 
@@ -190,6 +191,8 @@ def publish(cfg: Config, store: Store, *, remote: str | None = None,
         for name in DB_FILES[1:]:
             (site / name).unlink(missing_ok=True)
         (site / ".nojekyll").touch()
+        plan.thinned = archive.prune(site / "archive",
+                                     keep_days=int(cfg.get("publish.archive_keep_days", 30)))
         plan.snapshots = archive.build(site / "archive")
 
         for p in sorted(site.rglob("*")):

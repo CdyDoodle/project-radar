@@ -194,6 +194,9 @@ class Store:
         ids = [r["id"] for r in self.forgotten()]
         with self.tx():
             self.conn.executemany("DELETE FROM items WHERE id = ?", [(i,) for i in ids])
+        if ids:
+            # Deleted rows leave the file the same size until it is rebuilt.
+            self.conn.execute("VACUUM")
         return len(ids)
 
     @contextmanager

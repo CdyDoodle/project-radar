@@ -151,3 +151,18 @@ def test_starting_an_existing_run_keeps_its_start_and_stats(store):
     store.start_run("r1")
     row = store.conn.execute("SELECT started_at, stats FROM runs WHERE id='r1'").fetchone()
     assert row[0] == first and json.loads(row[1]) == {"_merged": 10}
+
+
+def test_prune_reclaims_space(cfg):
+    store = open_store(cfg)
+    s = store.begin_fetch()
+    for i in range(300):
+        it = repo(f"x/{i}"); it.readme = "r" * 20_000
+        store.upsert(it, s)
+    for _ in range(3):
+        advance(store)
+    store.conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    before = cfg.db_path.stat().st_size
+    assert store.prune() == 300
+    store.conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    assert cfg.db_path.stat().st_size < before / 2

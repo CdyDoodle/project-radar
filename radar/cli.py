@@ -308,7 +308,9 @@ def cmd_publish(args) -> int:
                   f"{len(plan.files)} files, {total / 1_048_576:.1f} MB, to the "
                   f"gh-pages branch as one commit")
     if plan.archived_as:
-        console.print(f"  previous page -> {plan.archived_as} ({plan.snapshots} archived)")
+        console.print(f"  previous page -> {plan.archived_as} ({plan.snapshots} archived"
+                      + (f", {len(plan.thinned)} older ones thinned to one a week" if plan.thinned else "")
+                      + ")")
     if plan.remote_runs:
         console.print(f"  published corpus had {plan.remote_runs} runs, all present locally")
     if plan.site_url:

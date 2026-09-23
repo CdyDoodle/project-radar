@@ -250,6 +250,11 @@ timeout_seconds = 1200
 # desktop app on Windows.
 # claude_path = "C:/path/to/claude.exe"
 
+[publish]
+# Archived pages younger than this are all kept; older ones are thinned to
+# one per week. Each page is about half a megabyte.
+archive_keep_days = 30
+
 [report]
 # Default language of the dashboard and digest: "en" or "zh-CN". The page has
 # a toggle either way; this only picks what it shows first.

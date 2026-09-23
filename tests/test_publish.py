@@ -123,3 +123,25 @@ def test_nothing_to_publish_is_an_error(store, cfg, remote):
 ])
 def test_pages_url(remote, url):
     assert pub.pages_url(remote) == url
+
+
+def test_archive_is_thinned_to_one_page_a_week_after_keep_days(tmp_path):
+    from datetime import datetime, timedelta, timezone
+    from radar import archive
+    now = datetime(2026, 9, 23, 12, 0, tzinfo=timezone.utc)
+    names = []
+    for days_ago in range(0, 70, 2):                       # a page every other day
+        when = now - timedelta(days=days_ago)
+        name = when.strftime("%Y-%m-%d-%H%M") + ".html"
+        (tmp_path / name).write_text("x"); names.append((days_ago, name))
+    (tmp_path / "index.html").write_text("index")
+    removed = archive.prune(tmp_path, keep_days=30, now=now)
+    kept = {p.name for p in tmp_path.glob("*.html")}
+    recent = [n for d, n in names if d <= 30]
+    assert all(n in kept for n in recent)                  # nothing recent touched
+    older = [n for d, n in names if d > 30]
+    assert 0 < len([n for n in older if n in kept]) < len(older)
+    weeks = {datetime.strptime(n[:10], "%Y-%m-%d").isocalendar()[:2]
+             for n in older if n in kept}
+    assert len(weeks) == len([n for n in older if n in kept])   # one per week
+    assert "index.html" in kept and removed and archive.prune(tmp_path, 30, now) == []

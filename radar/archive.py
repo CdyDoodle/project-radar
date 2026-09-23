@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 STAMP = re.compile(r"^(\d{4})-(\d{2})-(\d{2})-(\d{2})(\d{2})\.html$")
@@ -48,6 +48,37 @@ footer{{margin-top:44px;color:var(--muted);font-size:12px;font-family:var(--mono
 <footer>built by <a href="https://github.com/CdyDoodle/project-radar">project-radar</a></footer>
 </div></body></html>
 """
+
+
+def prune(archive_dir: Path, keep_days: int = 30, now: datetime | None = None) -> list[str]:
+    """Thin the archive: every page from the last `keep_days`, then one a week.
+
+    Each archived page is about half a megabyte, and a publish adds one. Kept
+    forever that is the bulk of the site within a year. Beyond `keep_days`
+    only the newest page of each ISO week survives. Returns the names removed.
+    """
+    now = now or datetime.now(timezone.utc)
+    dated = []
+    for path in archive_dir.glob("*.html"):
+        m = STAMP.match(path.name)
+        if not m:
+            continue
+        y, mo, d, hh, mm = (int(g) for g in m.groups())
+        dated.append((datetime(y, mo, d, hh, mm, tzinfo=timezone.utc), path))
+    dated.sort(reverse=True)                       # newest first
+    keep_after = now - timedelta(days=keep_days)
+    seen_weeks: set[tuple[int, int]] = set()
+    removed = []
+    for when, path in dated:
+        if when >= keep_after:
+            continue
+        week = when.isocalendar()[:2]
+        if week in seen_weeks:
+            path.unlink()
+            removed.append(path.name)
+        else:
+            seen_weeks.add(week)
+    return removed
 
 
 def build(archive_dir: Path) -> int:
