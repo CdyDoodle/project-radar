@@ -108,6 +108,9 @@ class GitHubTrending:
     name = "github_trending"
     _STARS_TODAY = re.compile(r"([\d,]+)\s+stars?\s+(today|this week|this month)")
 
+    _PERIOD_METRIC = {"today": "stars_today", "this week": "stars_this_week",
+                      "this month": "stars_this_month"}
+
     def fetch(self, cfg: Config, http: Http) -> list[Item]:
         conf = cfg.get("sources.github_trending", {}) or {}
         windows = conf.get("windows", ["daily", "weekly"])
@@ -119,32 +122,77 @@ class GitHubTrending:
                 resp = http.get(url, params={"since": since})
                 if resp is None:
                     continue
-                soup = BeautifulSoup(resp.content, "html.parser")
-                for art in soup.select("article.Box-row"):
-                    link = art.select_one("h2 a")
-                    if not link or not link.get("href"):
-                        continue
-                    full = link["href"].strip("/")
-                    desc_el = art.select_one("p")
-                    lang_el = art.select_one('[itemprop="programmingLanguage"]')
-                    period = ""
-                    for span in art.select("span.d-inline-block.float-sm-right"):
-                        m = self._STARS_TODAY.search(span.get_text(" ", strip=True))
-                        if m:
-                            period = m.group(0)
-                    items.append(Item(
-                        key=f"gh:{full.lower()}",
-                        url=f"https://github.com/{full}",
-                        title=full,
-                        source=self.name,
-                        summary=desc_el.get_text(" ", strip=True) if desc_el else "",
-                        author=full.split("/")[0],
-                        lang=lang_el.get_text(strip=True) if lang_el else None,
-                        metrics={"trending_windows": [since]},
-                        evidence=[f"GitHub trending ({since}){': ' + period if period else ''}"],
-                    ))
+                items.extend(self.parse(resp.content, since))
                 log.info("github_trending %s/%s -> %d", since, lang or "all", len(items))
+        if conf.get("hydrate", True):
+            items = hydrate(http, items, workers=int(conf.get("hydrate_workers", 8)))
         return items
+
+    def parse(self, html: bytes | str, since: str) -> list[Item]:
+        soup = BeautifulSoup(html, "html.parser")
+        out = []
+        for art in soup.select("article.Box-row"):
+            link = art.select_one("h2 a")
+            if not link or not link.get("href"):
+                continue
+            full = link["href"].strip("/")
+            desc_el = art.select_one("p")
+            lang_el = art.select_one('[itemprop="programmingLanguage"]')
+            period = ""
+            metrics: dict = {"trending_windows": [since]}
+            for span in art.select("span.d-inline-block.float-sm-right"):
+                m = self._STARS_TODAY.search(span.get_text(" ", strip=True))
+                if m:
+                    period = m.group(0)
+                    metrics[self._PERIOD_METRIC[m.group(2)]] = int(m.group(1).replace(",", ""))
+            out.append(Item(
+                key=f"gh:{full.lower()}",
+                url=f"https://github.com/{full}",
+                title=full,
+                source=self.name,
+                summary=desc_el.get_text(" ", strip=True) if desc_el else "",
+                author=full.split("/")[0],
+                lang=lang_el.get_text(strip=True) if lang_el else None,
+                metrics=metrics,
+                evidence=[f"GitHub trending ({since}){': ' + period if period else ''}"],
+            ))
+        return out
+
+
+def hydrate(http: Http, items: list[Item], workers: int = 8) -> list[Item]:
+    """Replace scraped trending rows with full API metadata.
+
+    The trending page carries a name, a description and a language -- no
+    star count, no creation date, no topics. Without them `fit`, `depth`,
+    `freshness` and the `mega` penalty all score on nothing, for what was
+    the second-largest bucket in the corpus. One cached API call per unique
+    repo fixes that; a failed call keeps the scraped row as it was.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    unique = list(dict.fromkeys(it.repo for it in items if it.repo))
+
+    def one(name: str):
+        return name, http.gh(f"/repos/{name}")
+
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        meta = {name: data for name, data in pool.map(one, unique)
+                if isinstance(data, dict) and data.get("full_name")}
+
+    out = []
+    for it in items:
+        data = meta.get(it.repo or "")
+        full = _repo_item(data, it.source, it.evidence[0]) if data else None
+        if full is None:
+            out.append(it)
+            continue
+        full.evidence = list(it.evidence)
+        full.metrics.update(it.metrics)          # keep trending_windows, stars_today
+        full.summary = full.summary or it.summary
+        full.lang = full.lang or it.lang
+        out.append(full)
+    log.info("github_trending hydrated %d/%d repos", len(meta), len(unique))
+    return out
 
 
 @register

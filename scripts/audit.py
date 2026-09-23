@@ -58,7 +58,8 @@ def audit(cfg, store: Store, top_n: int = 250) -> dict:
         "trending_only": len(trending_only),
         "trending_only_without_stars": sum(1 for i in trending_only if not i.metrics.get("stars")),
         "without_created_at": sum(1 for i in items if not i.created_at),
-        "fit_substring_false_positives": _substring_false_positives(
+        # Mentions a substring test would count and the word-boundary test does not.
+        "substring_only_mentions": _substring_false_positives(
             items, ["rust", "agent", "gpu", "llm", "zig"]),
         "top_axis_mix": dict(Counter(axis.of_item(store.to_item(r)) for r in top)),
         "top_stale_rows": sum(1 for r in top if (r["last_seen"] or "") < cutoff),

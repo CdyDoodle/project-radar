@@ -24,8 +24,9 @@ thesis that can be falsified early.
 """
 
 [interests]
-# Weighted keywords. Higher = pulls harder. These are matched against title,
-# description, topics, language and the first chunk of the README.
+# Weighted keywords. Higher = pulls harder. Matched as whole words (plurals
+# and hyphens allowed, so "agent" finds "agents" but not "reagent") against
+# title, description, topics, language and the first chunk of the README.
 "inference" = 1.0
 "compiler" = 1.0
 "distributed" = 0.9
@@ -178,6 +179,11 @@ queries = [
 enabled = true
 windows = ["daily", "weekly"]
 languages = ["", "rust", "zig", "c", "cpp", "go"]
+# The trending page has no star count, creation date or topics, so each repo
+# is looked up once through the API (cached). Without it fit, depth,
+# freshness and the mega penalty score trending repos on nothing.
+hydrate = true
+hydrate_workers = 8
 
 [sources.hackernews]
 enabled = true

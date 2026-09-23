@@ -50,6 +50,15 @@ def canonical_key(url: str) -> str:
     return f"url:{urlunparse(('', host, path, '', query, '')).lstrip('/')}"
 
 
+# Metrics that describe the thing *right now*. Across runs the fresh reading
+# replaces the stored one; everything else accumulates (see Item.carry_forward).
+SNAPSHOT_METRICS = frozenset({
+    "stars", "forks", "open_issues", "age_days", "stars_per_day",
+    "days_since_push", "archived", "stars_today", "stars_this_week",
+})
+MAX_EVIDENCE = 12
+
+
 def stable_id(key: str) -> str:
     return hashlib.sha1(key.encode("utf-8")).hexdigest()[:16]
 
@@ -82,10 +91,18 @@ class Item:
     def repo(self) -> str | None:
         return self.key[3:] if self.key.startswith("gh:") else None
 
+    def _is_github_title(self, title: str) -> bool:
+        return bool(self.repo) and title.lower() == self.repo
+
+    def _merge_evidence(self, older: list[str], newer: list[str]) -> None:
+        # Newest first, deduplicated, capped: evidence accumulates across runs
+        # ("trending daily: 120 stars today" every day) and would grow forever.
+        self.evidence = list(dict.fromkeys(newer + older))[:MAX_EVIDENCE]
+
     def merge(self, other: "Item") -> None:
-        """Fold another sighting of the same thing into this one."""
+        """Fold another sighting of the same thing, from the same fetch, into this one."""
         self.sources |= other.sources
-        self.evidence += other.evidence
+        self._merge_evidence(other.evidence, self.evidence)
         self.topics = list(dict.fromkeys(self.topics + other.topics))
         # Prefer the richer text and the more specific metadata.
         if len(other.summary) > len(self.summary):
@@ -93,13 +110,47 @@ class Item:
         for attr in ("author", "lang", "created_at"):
             if getattr(self, attr) in (None, "") and getattr(other, attr) is not None:
                 setattr(self, attr, getattr(other, attr))
-        if not self.title or (other.source == "github" and other.title):
+        # A repo's name beats an HN headline about it.
+        if not self.title or (other.source.startswith("github") and other.title):
             self.title = other.title or self.title
         for k, v in other.metrics.items():
             # Keep the largest observation of any numeric metric; union the sets.
+            # (Both sightings are from the same moment, so max is safe here.)
             if isinstance(v, (int, float)) and isinstance(self.metrics.get(k), (int, float)):
                 self.metrics[k] = max(self.metrics[k], v)
             elif isinstance(v, list) and isinstance(self.metrics.get(k), list):
                 self.metrics[k] = sorted(set(self.metrics[k]) | set(v))
+            else:
+                self.metrics.setdefault(k, v)
+
+    def carry_forward(self, prev: "Item") -> None:
+        """Fold the stored copy from earlier runs into this fresh sighting.
+
+        Different from `merge`. Signals that accumulate -- which sources have
+        seen it, who starred it, which trending windows, peak HN points --
+        are unioned, so an HN thread last week and a trending entry today
+        still count as two sources agreeing. Point-in-time metrics (stars,
+        push age, archived) take the fresh value: max-merging those across
+        runs would pin `days_since_push` at its stalest reading forever.
+        """
+        self.sources |= prev.sources
+        self._merge_evidence(prev.evidence, self.evidence)
+        self.topics = list(dict.fromkeys(self.topics + prev.topics))
+        if not self.summary:
+            self.summary = prev.summary
+        for attr in ("author", "lang", "created_at"):
+            if getattr(self, attr) in (None, "") and getattr(prev, attr) is not None:
+                setattr(self, attr, getattr(prev, attr))
+        if prev._is_github_title(prev.title) and not self._is_github_title(self.title):
+            self.title = prev.title
+        for k, v in prev.metrics.items():
+            mine = self.metrics.get(k)
+            if k in SNAPSHOT_METRICS:
+                self.metrics.setdefault(k, v)
+            elif isinstance(v, list) and isinstance(mine, list):
+                self.metrics[k] = sorted(set(mine) | set(v))
+            elif (isinstance(v, (int, float)) and not isinstance(v, bool)
+                  and isinstance(mine, (int, float))):
+                self.metrics[k] = max(mine, v)
             else:
                 self.metrics.setdefault(k, v)

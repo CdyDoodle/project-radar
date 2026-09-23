@@ -6,6 +6,7 @@ here". If a ranking looks wrong, the breakdown tells you which weight to turn.
 """
 from __future__ import annotations
 
+import functools
 import math
 import re
 
@@ -150,6 +151,19 @@ def watchlist(item: Item) -> float:
     return 0.0 if n == 0 else 1 - 0.55 ** n
 
 
+@functools.lru_cache(maxsize=512)
+def term_pattern(term: str) -> re.Pattern:
+    """Whole-word match for a keyword, tolerating plurals and hyphenation.
+
+    Plain substring matching scored "rust" on every abstract that mentions
+    trust and "agent" on "reagent". Spaces also match hyphens and
+    underscores, so "formal verification" finds the `formal-verification`
+    topic, which a substring test never could.
+    """
+    words = [re.escape(w) for w in term.lower().split()]
+    return re.compile(r"(?<!\w)" + r"[\s_-]+".join(words) + r"(?:s|es)?(?!\w)")
+
+
 def fit(item: Item, interests: dict[str, float]) -> float:
     if not interests:
         return 0.0
@@ -157,7 +171,7 @@ def fit(item: Item, interests: dict[str, float]) -> float:
     total = sum(abs(w) for w in interests.values()) or 1.0
     hit = 0.0
     for term, weight in interests.items():
-        if term in text:
+        if term_pattern(term).search(text):
             hit += weight
     return max(0.0, min(1.0, hit / (total * 0.35)))
 
@@ -173,7 +187,7 @@ def depth(item: Item) -> float:
     topical = len(set(item.topics) & DEPTH_TOPICS)
     lang = DEPTH_LANGS.get((item.lang or "").lower(), 0.3)
     text = _text_of(item)
-    keyword_hits = sum(1 for t in DEPTH_TOPICS if t.replace("-", " ") in text)
+    keyword_hits = sum(1 for t in DEPTH_TOPICS if term_pattern(t.replace("-", " ")).search(text))
     if item.key.startswith("arxiv:"):
         return max(0.75, min(1.0, 0.75 + 0.05 * keyword_hits))
     return min(1.0, 0.45 * lang + 0.25 * min(topical, 2) + 0.06 * min(keyword_hits, 5))

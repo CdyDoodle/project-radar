@@ -36,7 +36,6 @@ def test_merge_unions_sources_evidence_and_keeps_max_metrics():
     assert a.summary == "a much longer description"
 
 
-@pytest.mark.xfail(strict=True, reason="fixed in phase 1")
 def test_merge_does_not_duplicate_evidence():
     a = repo("x/y", source="github_search")
     b = repo("x/y", source="github_search")
@@ -44,7 +43,6 @@ def test_merge_does_not_duplicate_evidence():
     assert len(a.evidence) == 1
 
 
-@pytest.mark.xfail(strict=True, reason="fixed in phase 1")
 def test_merge_prefers_github_title_over_hn_headline():
     hn = repo("x/y", source="hackernews")
     hn.title = "Show HN: My cool thing"

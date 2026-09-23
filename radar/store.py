@@ -80,12 +80,20 @@ class Store:
 
     # -- items -----------------------------------------------------------
     def upsert(self, item: Item) -> str:
-        """Insert or refresh. Preserves status, first_seen, and any stored card."""
+        """Insert or refresh. Preserves status, first_seen, and any stored card.
+
+        A refresh folds the stored copy into the fresh sighting first, so
+        sources, watchers and evidence seen in earlier runs are kept. Without
+        this, cross-source corroboration only counted when two sources
+        happened to land in the same fetch.
+        """
         ts = now().isoformat()
         row = self.conn.execute(
-            "SELECT first_seen FROM items WHERE key = ?", (item.key,)
+            "SELECT * FROM items WHERE key = ?", (item.key,)
         ).fetchone()
         first_seen = row["first_seen"] if row else ts
+        if row:
+            item.carry_forward(self.to_item(row))
         self.conn.execute(
             """
             INSERT INTO items (id, key, url, title, summary, author, lang, topics,
