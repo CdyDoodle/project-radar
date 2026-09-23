@@ -6,3 +6,5 @@ out/
 radar.db*
 __pycache__/
 *.pyc
+.audit/
+.pytest_cache/

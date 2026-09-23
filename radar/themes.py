@@ -56,7 +56,8 @@ THEME_PATTERNS: dict[str, str] = {
                      r"neural (network|operator)|attention mechanism|\bbenchmark\b|"
                      r"training (data|dataset)|dataset for|model (training|weights)",
     "compilers-pl":  r"compiler|parser|\bjit\b|interpreter|type system|type.?check|"
-                     r"lexer|\blsp\b|language server|bytecode|codegen|\bast\b|transpil|"
+                     # \b on lexer: "multiplexer" filed every tmux clone here.
+                     r"\blexer|\blsp\b|language server|bytecode|codegen|\bast\b|transpil|"
                      r"\bmojo\b|(programming|functional|systems|scripting) language|"
                      r"\bdsl\b|linker|\babi\b|cosmopolitan|binary format|\bbun\b|"
                      r"formatting library|\bmacros?\b",
@@ -127,7 +128,10 @@ THEME_PATTERNS: dict[str, str] = {
                      r"document (conversion|parsing)|\bocr\b|scraper|crawler|"
                      r"convert .{0,40}(pdf|markdown|docx|csv)|\bpdf\b|spreadsheet|"
                      r"structured (extraction|output)|compression|\bzstd\b|\bcodec\b|"
-                     r"\barchive\b|\bencoding\b",
+                     # NOT a bare \barchive\b -- HN story text is full of
+                     # archive.ph paywall links, and "Restroom Archive" is a
+                     # headline, not a data tool.
+                     r"archive (format|file|viewer|extractor|tool)s?\b|\bencoding\b",
     "graphics-media": r"\brender(er|ing)?\b|\bvideo\b|\baudio\b|\b3d\b|game engine|"
                       r"shader|raytrac|image (processing|editing|manipulation)|"
                       r"\bgraphics\b|\bwgpu\b|\bvulkan\b|\bopengl\b|\bwebgpu\b|\bfont\b|"
