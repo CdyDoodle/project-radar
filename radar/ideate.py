@@ -25,6 +25,7 @@ import logging
 import os
 import shutil
 import subprocess
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -270,18 +271,29 @@ def run_claude(cfg: Config, exe: str, system: str, prompt: str,
     timeout = float(cfg.get("brief.timeout_seconds", 1200))
 
     last: Exception | None = None
-    for attempt in range(2):
+    waits = list(TRANSIENT_WAITS)
+    attempt = 0
+    while attempt < 2:
         try:
             raw = json.loads(_invoke(args, prompt, timeout))
         except (ValueError, subprocess.TimeoutExpired) as exc:
             last = exc
+            attempt += 1
             continue
         if raw.get("is_error"):
             msg = str(raw.get("result") or raw.get("terminal_reason") or "unknown error")
-            if "log" in msg.lower() and "in" in msg.lower():
+            if "not logged in" in msg.lower():
                 raise ClaudeCodeError(f"{msg} -- run `claude` and /login once")
             last = ClaudeCodeError(msg)
+            if _is_transient(msg) and waits:
+                # Waiting does not use up a real attempt: these clear on their own.
+                wait = waits.pop(0)
+                log.warning("transient Claude Code error, retrying in %ss: %s", wait, msg[:160])
+                _sleep(wait)
+                continue
+            attempt += 1
             continue
+        attempt += 1
         payload = raw.get("structured_output")
         if payload is None:
             payload = _json_from_text(raw.get("result") or "")
@@ -290,15 +302,28 @@ def run_claude(cfg: Config, exe: str, system: str, prompt: str,
             # explanation is the only useful diagnostic, so carry it through.
             said = " ".join(str(raw.get("result") or "").split())[:400]
             last = ClaudeCodeError(f"no structured answer. Claude Code said: {said}")
-            log.warning("attempt %d: %s", attempt + 1, last)
+            log.warning("attempt %d: %s", attempt, last)
             continue
         try:
             return model.model_validate(payload)
         except ValidationError as exc:
             last = exc
-            log.warning("attempt %d: answer did not match the schema: %s", attempt + 1,
+            log.warning("attempt %d: answer did not match the schema: %s", attempt,
                         str(exc)[:300])
     raise ClaudeCodeError(f"no valid answer after 2 attempts: {last}")
+
+
+# Errors that clear on their own: several Claude Code processes refreshing the
+# same login token at once (the first run after the token expires), or load.
+TRANSIENT_MARKERS = ("refresh oauth token", "refreshing it", "overloaded",
+                     "rate limit", "temporarily unavailable")
+TRANSIENT_WAITS = (20, 60)       # seconds before the 1st and 2nd extra try
+_sleep = time.sleep              # replaced in tests
+
+
+def _is_transient(msg: str) -> bool:
+    low = msg.lower()
+    return any(m in low for m in TRANSIENT_MARKERS)
 
 
 def _json_from_text(text: str):
@@ -380,19 +405,24 @@ def make_cards(cfg: Config, store: Store, limit: int | None = None) -> int:
     made = 0
     stamp = now().isoformat()
     workers = max(1, int(cfg.get("brief.max_workers", 3)))
+    # The first batch runs alone. If the login token needs refreshing, one
+    # process refreshes it; starting all batches at once made every process
+    # race for the refresh and all of them fail.
+    results = [one(batches[0])]
     with ThreadPoolExecutor(max_workers=workers) as pool_:
-        for batch, result in pool_.map(one, batches):
-            if result is None:
+        results += list(pool_.map(one, batches[1:]))
+    for batch, result in results:
+        if result is None:
+            continue
+        wanted = {r["id"] for r in batch}
+        for card in result.cards:
+            if card.id not in wanted:
+                log.warning("ignoring a card for an item not in the batch: %s", card.id)
                 continue
-            wanted = {r["id"] for r in batch}
-            for card in result.cards:
-                if card.id not in wanted:
-                    log.warning("ignoring a card for an item not in the batch: %s", card.id)
-                    continue
-                data = card.model_dump(exclude={"id"})
-                data["carded_at"] = stamp
-                store.set_card(card.id, data)
-                made += 1
+            data = card.model_dump(exclude={"id"})
+            data["carded_at"] = stamp
+            store.set_card(card.id, data)
+            made += 1
     log.info("wrote %d signal cards", made)
     return made
 

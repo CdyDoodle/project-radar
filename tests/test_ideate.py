@@ -111,6 +111,51 @@ def test_the_models_explanation_reaches_the_error(store, cfg, monkeypatch):
         ideate.run_claude(cfg, exe, "sys", "prompt", ideate.BriefBundle)
 
 
+def test_token_refresh_race_is_waited_out(store, cfg, monkeypatch):
+    """The first run of a day: every process races to refresh the login token."""
+    good = FakeClaude()
+    state = {"failures": 2}
+
+    def racing(args, stdin, timeout):
+        if "-p" in args and state["failures"]:
+            state["failures"] -= 1
+            return json.dumps({"is_error": True, "result":
+                               "Failed to refresh OAuth token: another Claude Code "
+                               "process is refreshing it or exited mid-refresh."})
+        return good(args, stdin, timeout)
+
+    slept = []
+    monkeypatch.setattr(ideate, "_invoke", racing)
+    monkeypatch.setattr(ideate, "find_claude", lambda cfg: "claude")
+    monkeypatch.setattr(ideate, "_sleep", slept.append)
+    seed(store, cfg)
+    assert ideate.make_cards(cfg, store) == 3
+    assert slept == [20, 60]          # waited it out instead of failing the batch
+
+
+def test_first_card_batch_runs_before_the_rest(store, cfg, monkeypatch):
+    import threading
+    order, lock = [], threading.Lock()
+    good = FakeClaude()
+
+    def tracked(args, stdin, timeout):
+        if "-p" in args:
+            with lock:
+                order.append(("start", stdin[:40]))
+            out = good(args, stdin, timeout)
+            with lock:
+                order.append(("end", stdin[:40]))
+            return out
+        return good(args, stdin, timeout)
+
+    monkeypatch.setattr(ideate, "_invoke", tracked)
+    monkeypatch.setattr(ideate, "find_claude", lambda cfg: "claude")
+    cfg.raw["brief"]["cards_per_call"] = 1
+    seed(store, cfg)
+    ideate.make_cards(cfg, store)
+    assert order[0][0] == "start" and order[1][0] == "end"   # batch 1 finished alone
+
+
 def test_not_logged_in_is_a_clear_error(store, cfg, monkeypatch):
     monkeypatch.setattr(ideate, "_invoke", FakeClaude(logged_in=False))
     monkeypatch.setattr(ideate, "find_claude", lambda cfg: "claude")
