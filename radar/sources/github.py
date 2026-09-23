@@ -182,7 +182,7 @@ def hydrate(http: Http, items: list[Item], workers: int = 8) -> list[Item]:
     out = []
     for it in items:
         data = meta.get(it.repo or "")
-        full = _repo_item(data, it.source, it.evidence[0]) if data else None
+        full = _repo_item(data, it.source, (it.evidence or [''])[0]) if data else None
         if full is None:
             out.append(it)
             continue

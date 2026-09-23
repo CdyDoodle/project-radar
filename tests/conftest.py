@@ -24,7 +24,7 @@ description = "test engineer"
 freshness_half_life_days = 45
 stale_after_days = 120
 mega_star_threshold = 40000
-forget_after_days = 30
+forget_after_runs = 3
 
 [rank.diversify]
 enabled = true

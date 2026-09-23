@@ -56,13 +56,15 @@ def collect(cfg: Config, store: Store, http: Http | None = None) -> dict:
             raw.extend(got)
 
     merged = merge_items(raw)
+    seq = store.begin_fetch()
     with store.tx():
         for item in merged.values():
-            store.upsert(item)
+            store.upsert(item, seq)
 
     stats["_raw"] = len(raw)
     stats["_merged"] = len(merged)
     stats["_collapsed"] = len(raw) - len(merged)
+    stats["_run"] = seq
     return stats
 
 

@@ -304,8 +304,25 @@ radar run       all of the above
 radar show      everything known about one item, incl. score breakdown
 radar save      mark items worth keeping
 radar dismiss   never show these again
+radar prune     delete items no recent run has seen (--dry-run to count)
+radar hydrate   backfill GitHub metadata for repos stored without it
 radar doctor    check config, GitHub rate limits, Claude Code login
 ```
+
+## Runs, not days
+
+Runs are manual and occasional, so time in the corpus is counted in runs. A
+fetch within `rank.run_gap_hours` (6) of the previous one belongs to the same
+run, so a rerun never counts as a second sighting.
+
+- An item no run has seen in `rank.forget_after_runs` (3) runs drops out of the
+  feed and out of the velocity percentiles, however long the gap between runs.
+  Saved items always stay. `radar prune` deletes forgotten items for good;
+  dismissed items are kept so they can't come back as new.
+- The `seen_before` penalty grows with each run that has already shown an item
+  and reaches its full weight after `rank.seen_before_full_after_runs` (6).
+
+The database carries a schema version and upgrades itself when opened.
 
 `radar show gh:owner/repo` is the one to reach for when a ranking looks wrong —
 it prints every component and penalty that produced the score.

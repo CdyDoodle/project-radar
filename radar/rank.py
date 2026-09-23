@@ -222,12 +222,25 @@ def penalties(item: Item, cfg: Config, row=None) -> dict[str, float]:
     if stars > mega:
         # Already famous. You can't do frontier work on something everyone found.
         out["mega"] = min(1.0, math.log1p(stars - mega) / math.log1p(mega))
-    if row is not None and row["first_seen"] and row["last_seen"]:
-        # Mild decay for things that have sat in the feed across many runs.
-        if row["first_seen"] != row["last_seen"]:
-            out["seen_before"] = 0.5
+    seen = _runs_seen(row)
+    if seen > 1:
+        # Decay by how many runs have already shown this item. A second
+        # sighting costs a little; one that has sat in the feed for
+        # `seen_before_full_after_runs` runs pays the full weight. Counted in
+        # runs, not days, because runs are occasional and manual.
+        full = max(2, int(cfg.get("rank.seen_before_full_after_runs", 6)))
+        out["seen_before"] = min(1.0, (seen - 1) / (full - 1))
     out.update(card_penalties(row))
     return out
+
+
+def _runs_seen(row) -> int:
+    if row is None:
+        return 0
+    try:
+        return int(row["runs_seen"] or 0)
+    except (IndexError, KeyError):
+        return 0
 
 
 def card_penalties(row) -> dict[str, float]:
@@ -291,9 +304,11 @@ def score_item(item: Item, cfg: Config, row=None,
 
 def rank_all(store, cfg: Config) -> list:
     """Rescore everything in the store. Cheap -- run it after any config change."""
-    rows = store.items(include_dismissed=True)
+    rows = store.items(include_dismissed=True, include_forgotten=True)
     items = [(row, store.to_item(row)) for row in rows]
-    corpus = Corpus([it for _, it in items])
+    # Velocity percentiles come from what is still being seen. Forgotten items
+    # keep frozen metrics forever and would skew the distribution.
+    corpus = Corpus([it for row, it in items if store.is_active(row)])
     with store.tx():
         for row, item in items:
             total, breakdown = score_item(item, cfg, row, corpus)

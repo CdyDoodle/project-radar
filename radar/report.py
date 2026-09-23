@@ -716,7 +716,9 @@ def build(cfg: Config, store: Store, run_id: str | None = None,
     theme_names = sorted({t for r in rows for t in r["themes"]})
     languages = sorted({r["lang"] for r in rows if r["lang"]})
     counts = store.counts()
-    stats = {"total": sum(counts.values()), "sources": source_names, **counts}
+    # "Tracked" is what recent runs still see; forgotten items are not in play.
+    stats = {"total": len(store.items(include_dismissed=True)),
+             "sources": source_names, **counts}
     generated = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     env = Environment(autoescape=True)

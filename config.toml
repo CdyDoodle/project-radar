@@ -56,6 +56,16 @@ thesis that can be falsified early.
 freshness_half_life_days = 45
 stale_after_days = 120
 mega_star_threshold = 40000
+# Runs are manual and occasional, so time in the corpus is counted in runs,
+# not days: a six-week gap between runs must not empty the feed.
+# Fetches within run_gap_hours of each other count as one run (reruns).
+run_gap_hours = 6
+# Items no run has seen in this many runs drop out of the feed and out of the
+# velocity percentiles. Saved items always stay. `radar prune` deletes them.
+forget_after_runs = 3
+# The seen_before penalty grows with each run that has already shown an item,
+# reaching its full weight after this many runs.
+seen_before_full_after_runs = 6
 
 [rank.diversify]
 # Redundancy control. Scoring ranks items independently, so N implementations of

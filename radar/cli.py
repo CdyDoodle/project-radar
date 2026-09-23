@@ -13,7 +13,7 @@ from rich.console import Console
 from rich.table import Table
 
 from radar import collect, config, diversify, rank, report
-from radar.store import Store
+from radar.store import Store, open_store
 
 console = Console()
 
@@ -34,7 +34,7 @@ def _setup(verbose: bool) -> None:
 
 
 def _open(cfg: config.Config) -> tuple[config.Config, Store]:
-    return cfg, Store(cfg.db_path)
+    return cfg, open_store(cfg)
 
 
 def _run_id() -> str:
@@ -208,7 +208,10 @@ def cmd_show(args) -> int:
     console.print(f"[dim]focus[/]    {_axis.label(_axis.of_item(item))}")
     console.print(f"[dim]themes[/]   {', '.join(sorted(_themes.of_item(item))) or '-'}")
     console.print(f"[dim]sources[/]  {', '.join(sorted(item.sources))}")
-    console.print(f"[dim]status[/]   {row['status']}")
+    console.print(f"[dim]status[/]   {row['status']}"
+                  + ("" if store.is_active(row) else "  [yellow](forgotten)[/]"))
+    console.print(f"[dim]seen[/]     in {row['runs_seen']} run(s), last in run "
+                  f"#{row['last_fetch']} of {store.current_fetch()}")
     console.print(f"[dim]metrics[/]  {json.dumps(item.metrics, default=str)}")
     if item.evidence:
         console.print("\n[dim]evidence[/]")
@@ -239,6 +242,42 @@ def cmd_verdict(args, status: str) -> int:
     return 0
 
 
+def cmd_prune(args) -> int:
+    cfg, store = _open(config.load(args.home))
+    gone = store.forgotten()
+    if args.dry_run or not gone:
+        console.print(f"{len(gone)} item(s) not seen in the last "
+                      f"{store.forget_after_runs} runs" + (" (dry run)" if gone else ""))
+        return 0
+    n = store.prune()
+    console.print(f"[green]{n}[/] forgotten item(s) deleted; saved and dismissed items kept")
+    return 0
+
+
+def cmd_hydrate(args) -> int:
+    """Backfill GitHub metadata for repos that were stored without it."""
+    from radar.sources.github import hydrate
+    cfg, store = _open(config.load(args.home))
+    rows = [r for r in store.items(include_forgotten=args.all)
+            if r["key"].startswith("gh:") and "stars" not in json.loads(r["metrics"] or "{}")]
+    if args.limit:
+        rows = rows[:args.limit]
+    if not rows:
+        console.print("nothing to backfill")
+        return 0
+    with console.status(f"looking up {len(rows)} repos..."):
+        out = hydrate(collect.make_http(cfg), [store.to_item(r) for r in rows])
+    done = 0
+    with store.tx():
+        for it in out:
+            if "stars" in it.metrics and store.refresh(it):
+                done += 1
+    rank.rank_all(store, cfg)
+    console.print(f"[green]{done}[/] of {len(rows)} repos backfilled "
+                  f"({len(rows) - done} not found: renamed, deleted or private); rescored")
+    return 0
+
+
 def cmd_watch(args) -> int:
     cfg, _ = _open(config.load(args.home))
     users = cfg.watchlist
@@ -254,10 +293,13 @@ def cmd_watch(args) -> int:
 def cmd_doctor(args) -> int:
     import os
     cfg = config.load(args.home)
-    store = Store(cfg.db_path)
+    store = open_store(cfg)
     http = collect.make_http(cfg)
     console.print(f"config     {cfg.home / config.CONFIG_NAME}")
     console.print(f"database   {cfg.db_path}  {store.counts()}")
+    console.print(f"           schema v{store.schema_version} · run #{store.current_fetch()} · "
+                  f"{len(store.forgotten())} forgotten (not seen in "
+                  f"{store.forget_after_runs} runs; `radar prune` deletes them)")
     token = config.github_token()
     console.print(f"gh token   {'[green]yes[/]' if token else '[red]no[/]'}")
     if token:
@@ -350,6 +392,15 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("dismiss", help="never show these again")
     s.add_argument("idents", nargs="+")
     s.set_defaults(fn=lambda a: cmd_verdict(a, "dismissed"))
+
+    s = sub.add_parser("prune", help="delete items no recent run has seen")
+    s.add_argument("--dry-run", action="store_true")
+    s.set_defaults(fn=cmd_prune)
+
+    s = sub.add_parser("hydrate", help="backfill GitHub metadata for repos missing it")
+    s.add_argument("-n", "--limit", type=int)
+    s.add_argument("--all", action="store_true", help="include forgotten items too")
+    s.set_defaults(fn=cmd_hydrate)
 
     s = sub.add_parser("watch", help="show or extend the engineer watchlist")
     s.add_argument("--add", nargs="+")
