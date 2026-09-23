@@ -171,14 +171,20 @@ def cmd_run(args) -> int:
     console.print(f"[green]enrich[/]  {n} READMEs")
 
     if args.no_llm:
-        console.print("[yellow]skipping LLM passes (--no-llm)[/]")
+        console.print("[yellow]skipping Claude passes (--no-llm)[/]")
     else:
-        with console.status("4/5 triaging items with Claude (pass A)..."):
-            cards = ideate.make_cards(cfg, store)
-        console.print(f"[green]cards[/]   {cards}")
-        with console.status("5/5 synthesizing project briefs (pass B)..."):
-            briefs = ideate.make_briefs(cfg, store, run_id)
-        console.print(f"[green]briefs[/]  {len(briefs)}")
+        # The feed and report never depend on Claude Code: if it is missing or
+        # signed out, say so and publish everything else.
+        try:
+            with console.status("4/5 triaging items with Claude Code (pass A)..."):
+                cards = ideate.make_cards(cfg, store)
+            console.print(f"[green]cards[/]   {cards}")
+            rank.rank_all(store, cfg)   # fold new card penalties into the scores
+            with console.status("5/5 synthesizing project briefs (pass B)..."):
+                briefs = ideate.make_briefs(cfg, store, run_id)
+            console.print(f"[green]briefs[/]  {len(briefs)}")
+        except (SystemExit, ideate.ClaudeCodeError) as exc:
+            console.print(f"[yellow]skipping Claude passes:[/] {exc}")
 
     store.finish_run(run_id, stats)
     html, md = report.build(cfg, store, run_id=run_id, feed_limit=args.limit)
@@ -259,8 +265,20 @@ def cmd_doctor(args) -> int:
         search = http.gh_rate().get("search", {})
         console.print(f"  core   {core.get('remaining')}/{core.get('limit')}")
         console.print(f"  search {search.get('remaining')}/{search.get('limit')}")
-    key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
-    console.print(f"anthropic  {'[green]key set[/]' if key else '[yellow]no key -- `brief` will not run[/]'}")
+    from radar import ideate
+    st = ideate.auth_status(cfg)
+    if not st.get("found"):
+        console.print("claude     [yellow]not found -- `cards`/`brief` will not run "
+                      "(set brief.claude_path)[/]")
+    elif not st.get("loggedIn"):
+        console.print(f"claude     [yellow]not logged in -- run `claude`, then /login[/]\n"
+                      f"           {st['path']}")
+    else:
+        console.print(f"claude     [green]logged in[/] ({st.get('authMethod', '?')})\n"
+                      f"           {st['path']}")
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        console.print("           [dim]ANTHROPIC_API_KEY is set; radar withholds it from "
+                      "Claude Code so briefs use your Claude login[/]")
     console.print(f"watchlist  {len(cfg.watchlist)} engineers")
     console.print(f"interests  {len(cfg.interests)} weighted terms")
     from radar.sources import all_source_names
@@ -299,11 +317,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("-n", "--limit", type=int, default=25)
     s.set_defaults(fn=cmd_enrich)
 
-    s = sub.add_parser("cards", help="LLM pass A: triage top items")
+    s = sub.add_parser("cards", help="Claude Code pass A: triage top items")
     s.add_argument("-n", "--limit", type=int)
     s.set_defaults(fn=cmd_cards)
 
-    s = sub.add_parser("brief", help="LLM pass B: synthesize project briefs")
+    s = sub.add_parser("brief", help="Claude Code pass B: synthesize project briefs")
     s.add_argument("--run")
     s.set_defaults(fn=cmd_brief)
 
@@ -317,7 +335,7 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("run", help="fetch + rank + enrich + brief + report")
     s.add_argument("-n", "--limit", type=int, default=250,
                    help="rows rendered into the page (the UI pages client-side)")
-    s.add_argument("--no-llm", action="store_true", help="skip the Claude passes")
+    s.add_argument("--no-llm", action="store_true", help="skip the Claude Code passes")
     s.add_argument("--no-open", action="store_true")
     s.set_defaults(fn=cmd_run)
 

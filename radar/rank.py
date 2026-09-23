@@ -7,6 +7,7 @@ here". If a ranking looks wrong, the breakdown tells you which weight to turn.
 from __future__ import annotations
 
 import functools
+import json
 import math
 import re
 
@@ -72,6 +73,9 @@ DEFAULT_PENALTIES = {
     "archived": 1.5,
     "mega": 0.5,
     "seen_before": 0.3,
+    # From Claude's signal card (radar/ideate.py), when one exists.
+    "low_substance": 2.0,
+    "shallow": 0.8,
 }
 
 
@@ -222,6 +226,35 @@ def penalties(item: Item, cfg: Config, row=None) -> dict[str, float]:
         # Mild decay for things that have sat in the feed across many runs.
         if row["first_seen"] != row["last_seen"]:
             out["seen_before"] = 0.5
+    out.update(card_penalties(row))
+    return out
+
+
+def card_penalties(row) -> dict[str, float]:
+    """Penalties from a signal card, so what Claude learned reaches the feed.
+
+    Penalty-only on purpose. Only the top few items ever get carded, so a
+    positive "card depth" bonus would lift exactly those items further and
+    keep them there. A penalty can only push down what a reader judged thin.
+    """
+    if row is None:
+        return {}
+    try:
+        raw = row["card"]
+    except (IndexError, KeyError):
+        return {}
+    if not raw:
+        return {}
+    try:
+        card = json.loads(raw)
+    except ValueError:
+        return {}
+    out: dict[str, float] = {}
+    if card.get("low_substance"):
+        out["low_substance"] = 1.0
+    depth_ = card.get("technical_depth")
+    if isinstance(depth_, int) and depth_ <= 2:
+        out["shallow"] = 1.0 if depth_ <= 1 else 0.5
     return out
 
 

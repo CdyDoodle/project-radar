@@ -2,11 +2,11 @@ name: radar
 
 # Reruns the pipeline, publishes the new dashboard to GitHub Pages, and keeps
 # every previous run as a dated snapshot under /archive/.
+#
+# Manual only: trigger it from the Actions tab ("Run workflow") when you want
+# a fresh page. There is no schedule. Briefs are generated locally through
+# Claude Code (`radar run`), not here -- CI has no Claude login.
 on:
-  schedule:
-    # 06:00 UTC daily. GitHub queues scheduled runs under load, so treat the
-    # time as approximate.
-    - cron: "0 6 * * *"
   workflow_dispatch:
   # Pushes and pull requests only run the tests; they never publish.
   push:
@@ -32,10 +32,9 @@ jobs:
 
   run:
     needs: test
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    # Pass B at high effort can run for many minutes on its own.
-    timeout-minutes: 45
+    timeout-minutes: 25
     # Never let two runs publish at once; they would race on the gh-pages branch.
     concurrency:
       group: radar-publish
@@ -79,18 +78,8 @@ jobs:
         env:
           # radar reads GITHUB_TOKEN for the GitHub API (5000 req/hr).
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          set -euo pipefail
-          # The Claude passes only run when the secret is present; without it
-          # the ranked feed and highlights still publish.
-          if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-            echo "ANTHROPIC_API_KEY present - generating briefs"
-            python -m radar run --no-open
-          else
-            echo "no ANTHROPIC_API_KEY - skipping the LLM passes"
-            python -m radar run --no-open --no-llm
-          fi
+        # Briefs need a Claude Code login, which only exists on your machine.
+        run: python -m radar run --no-open --no-llm
 
       - name: Publish new snapshot and archive the old one
         run: |

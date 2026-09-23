@@ -105,6 +105,10 @@ stale = 0.6
 archived = 1.5
 mega = 0.5
 seen_before = 0.3
+# From Claude Code's signal cards, only on items that have one. Penalty-only:
+# a bonus would keep lifting the few items that get carded at all.
+low_substance = 2.0
+shallow = 0.8
 
 ####################################################################
 # Sources
@@ -204,18 +208,37 @@ per_category = 40
 categories = ["cs.LG", "cs.PL", "cs.DC", "cs.OS", "cs.DB", "cs.AR"]
 
 ####################################################################
-# LLM ideation
+# Ideation, through Claude Code
+#
+# `radar cards` / `radar brief` (and `radar run` without --no-llm) call the
+# Claude Code CLI in headless mode with your existing Claude login. No API
+# key is used; one set in the environment is withheld from Claude Code.
+# Sign in once by running `claude` and typing /login. Check with
+# `radar doctor`. Each run counts against your Claude plan's usage limits.
 ####################################################################
 
 [brief]
-model = "claude-opus-5"
+# Empty = Claude Code's default model. Aliases like "opus" or "sonnet" work.
+model = ""
+# low | medium | high | xhigh | max
 effort = "high"
-# How many top-ranked items get a per-item analysis pass.
+# "en" or "zh-CN" (Simplified Chinese) for cards and briefs. Names, URLs and
+# technical terms stay as written.
+language = "en"
+# How many top-ranked items get a signal card, and how many go in one call.
 cards = 18
+cards_per_call = 6
+# Parallel Claude Code processes for the card pass.
+max_workers = 3
+# Cards older than this are redone, so a repo that changed gets re-read.
+card_ttl_days = 60
 # How many project briefs to synthesize from those cards.
 count = 8
 readme_chars = 8000
-max_workers = 6
+timeout_seconds = 1200
+# Leave unset to find `claude` on PATH, or the copy bundled with the Claude
+# desktop app on Windows.
+# claude_path = "C:/path/to/claude.exe"
 
 [storage]
 db = "radar.db"

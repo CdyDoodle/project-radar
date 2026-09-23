@@ -3,9 +3,10 @@
 Finds technically interesting projects worth building, by watching what strong
 engineers are actually doing.
 
-Six free sources feed a scoring pipeline; the survivors go through two Claude
-passes that turn raw signal into concrete project briefs scoped for a senior
-engineer with months rather than days.
+Six free sources feed a scoring pipeline; the survivors go through two passes
+in Claude Code that turn raw signal into concrete project briefs scoped for a
+senior engineer with months rather than days. No API key is needed: the briefs
+use your existing Claude Code login.
 
 No X/Twitter API — it has no free search tier ($200/mo minimum). The free
 sources below carry most of the same signal, because engineering threads on X
@@ -17,8 +18,12 @@ almost always point back at a repo or a paper. A new source is one class in
 Needs Python 3.11+ (for `tomllib`). Clone, then:
 
 ```bash
-python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt
+python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.lock
 ```
+
+`requirements.lock` holds the exact versions CI tests against;
+`requirements.txt` holds the ranges it was resolved from. For the briefs you
+also need [Claude Code](https://claude.com/claude-code), signed in once.
 
 On macOS/Linux use `.venv/bin/python` and call it as `python -m radar` — the
 `.cmd`/`.ps1` wrappers are Windows conveniences, not requirements.
@@ -37,9 +42,11 @@ Then run the pipeline:
 .\radar.cmd run
 ```
 
-`run` does the whole pipeline — fetch, rank, enrich, both Claude passes, report —
-and opens the dashboard. Without an Anthropic key, use `--no-llm` to get the
-ranked feed only.
+`run` does the whole pipeline — fetch, rank, enrich, both Claude Code passes,
+report — and opens the dashboard. If Claude Code is missing or signed out, `run`
+says so and still builds the ranked feed; `--no-llm` skips the passes on purpose.
+
+Run it whenever you want a fresh look. Nothing is scheduled.
 
 ## Where the signal comes from
 
@@ -102,7 +109,8 @@ Tune the weights in `config.toml`, then `radar rank` — no network, instant.
 ## Published dashboard
 
 A GitHub Actions workflow (`.github/workflows/radar.yml`) reruns the pipeline
-daily at 06:00 UTC and publishes to GitHub Pages:
+and publishes to GitHub Pages when you trigger it from the Actions tab
+("Run workflow"). There is no schedule. It publishes:
 
 - **`/`** — the latest run
 - **`/archive/`** — every previous run, dated, newest first
@@ -118,13 +126,14 @@ silently resets `first_seen` for everything — "new this run" would report the
 entire corpus, and the `seen_before` decay would stop working.
 
 **`gh-pages` keeps a single commit**, force-pushed each run. The dashboard plus
-the database is a few MB rewritten daily; keeping history would add that much
-per day forever. The archived files in the tree are the history worth keeping.
+the database is a few MB rewritten every run; keeping history would add that
+much each time. The archived files in the tree are the history worth keeping.
 
-The Claude passes run only when an `ANTHROPIC_API_KEY` repository secret is
-set. Without it the ranked feed, highlights and digest still publish.
+The workflow never generates briefs: those need a Claude Code login, which only
+exists on your machine. The ranked feed, highlights and digest still publish.
 
-Trigger a run by hand from the Actions tab (`workflow_dispatch`).
+The same workflow runs the test suite on every push and pull request; those
+runs never publish.
 
 ## The dashboard
 
@@ -256,11 +265,19 @@ it completely.
 ## How the briefs work
 
 Two passes, because a per-item summariser can only ever say "reimplement this".
+Both run through `claude -p`, Claude Code's headless mode, with tools disabled
+and a JSON schema for the answer, which radar validates and retries once.
 
-**Pass A — signal cards.** Each top item is read individually: what it actually
-is, technical depth 1–5 with a reason, what's still unsolved, and a
-`low_substance` flag. That flag is the noise filter regexes can't be: it catches
-the well-marketed empty repo.
+**Pass A — signal cards.** Each top item gets a card: what it actually is,
+technical depth 1–5 with a reason, what's still unsolved, and a `low_substance`
+flag. That flag is the noise filter regexes can't be: it catches the
+well-marketed empty repo. Items go six to a call, each judged on its own.
+
+Cards feed back into the ranking. A `low_substance` card and a depth of 1 or 2
+become penalties on that item, so the feed and highlights benefit, not just the
+briefs. There is deliberately no bonus: only the top few items are ever carded,
+and a bonus would keep lifting exactly those. Cards expire after
+`brief.card_ttl_days` (60) so a repo that changed gets read again.
 
 **Pass B — synthesis.** Every surviving card goes into one call together with
 your profile. Because the model sees the whole board at once, it can cross items
@@ -280,14 +297,14 @@ radar fetch     pull every enabled source
 radar rank      rescore everything (no network, instant)
 radar top       show the current ranking
 radar enrich    fetch READMEs for the top repos
-radar cards     Claude pass A: triage top items
-radar brief     Claude pass B: synthesize project briefs
+radar cards     Claude Code pass A: triage top items
+radar brief     Claude Code pass B: synthesize project briefs
 radar report    build the HTML dashboard + markdown digest
 radar run       all of the above
 radar show      everything known about one item, incl. score breakdown
 radar save      mark items worth keeping
 radar dismiss   never show these again
-radar doctor    check config, credentials, rate limits
+radar doctor    check config, GitHub rate limits, Claude Code login
 ```
 
 `radar show gh:owner/repo` is the one to reach for when a ranking looks wrong —
@@ -309,29 +326,36 @@ hate building. Vague profiles produce vague briefs.
 
 - **GitHub** — picked up automatically from `gh auth token` if you're logged in.
   Otherwise set `GITHUB_TOKEN`. Without one you'll hit rate limits fast.
-- **Anthropic** — `ANTHROPIC_API_KEY`. Only `cards` and `brief` need it;
-  everything else works without.
+- **Claude Code** — only `cards` and `brief` need it. Run `claude` once and
+  sign in with /login; `radar doctor` confirms it. radar finds `claude` on PATH,
+  or the copy the Claude desktop app bundles on Windows; set `brief.claude_path`
+  otherwise. No API key is read. If `ANTHROPIC_API_KEY` is set in your shell,
+  radar withholds it from Claude Code so a run can't be billed to an API account.
 
-```powershell
-$env:ANTHROPIC_API_KEY = "sk-ant-..."
-```
+## Usage
 
-## Cost
+Pass A is one Claude Code call per six items (18 items by default, so three
+calls), pass B is a single call. Both count against your Claude plan's usage
+limits. Use less by lowering `brief.cards` or setting `brief.effort = "medium"`.
+Cards are reused until they expire, so a rerun mostly pays for pass B.
 
-Pass A is one call per item (18 by default), pass B is a single call. On
-`claude-opus-5` at high effort a full run is roughly $1–3. Lower it by dropping
-`brief.cards`, setting `brief.effort = "medium"`, or pointing `brief.model` at
-`claude-sonnet-5`.
+Set `brief.language = "zh-CN"` to get cards and briefs in Simplified Chinese.
 
 Re-running `fetch` inside 30 minutes is served from `.cache/`, so tuning weights
 costs nothing.
 
-## Running it daily
+## Tests
 
-```powershell
-$repo = "C:\path\to\project-radar"
-$a = New-ScheduledTaskAction -Execute "$repo\radar.cmd" -Argument "run --no-open" -WorkingDirectory $repo
-Register-ScheduledTask -TaskName "radar" -Trigger (New-ScheduledTaskTrigger -Daily -At 7am) -Action $a
+```bash
+.venv/Scripts/python -m pip install -r requirements-dev.txt
+.venv/Scripts/python -m pytest -q
+```
+
+The theme and axis tests are a regression corpus of past misclassifications.
+Before and after any change to scoring or patterns, compare the corpus numbers:
+
+```bash
+.venv/Scripts/python scripts/audit.py
 ```
 
 Dismissed items never come back, and items that have sat in the feed across
