@@ -108,32 +108,38 @@ Tune the weights in `config.toml`, then `radar rank` — no network, instant.
 
 ## Published dashboard
 
-A GitHub Actions workflow (`.github/workflows/radar.yml`) reruns the pipeline
-and publishes to GitHub Pages when you trigger it from the Actions tab
-("Run workflow"). There is no schedule. It publishes:
+Publish from your machine, after a run:
+
+```bash
+.\radar.cmd run
+.\radar.cmd publish --dry-run
+.\radar.cmd publish
+```
+
+`publish` rebuilds the report and pushes it to the `gh-pages` branch, using
+your normal git credentials. The site gets:
 
 - **`/`** — the latest run
-- **`/archive/`** — every previous run, dated, newest first
+- **`/archive/`** — every previous page, dated, newest first
+- **`/digest.md`** and **`/radar.db`** — the digest and the corpus
 
-The page being replaced is what gets archived, so `/archive/` holds what was
-actually served rather than a re-render.
+Your machine is the single source of truth. Briefs can only be generated here
+(they need a Claude Code login), so the site is published from here too, and
+your local `radar.db` is the corpus. The GitHub Actions workflow only runs the
+tests.
 
-Two decisions worth knowing:
+Three decisions worth knowing:
 
-**The corpus lives on the `gh-pages` branch** as `radar.db`, restored at the
-start of each run. A cache would be simpler but is evictable, and losing it
-silently resets `first_seen` for everything — "new this run" would report the
-entire corpus, and the `seen_before` decay would stop working.
+**The page being replaced is what gets archived**, so `/archive/` holds what
+was actually served rather than a re-render.
 
-**`gh-pages` keeps a single commit**, force-pushed each run. The dashboard plus
-the database is a few MB rewritten every run; keeping history would add that
-much each time. The archived files in the tree are the history worth keeping.
+**`gh-pages` is one parentless commit**, force-pushed each time. The dashboard
+plus the database is a few MB; keeping history would add that much per publish,
+forever. The archived files in the tree are the history worth keeping.
 
-The workflow never generates briefs: those need a Claude Code login, which only
-exists on your machine. The ranked feed, highlights and digest still publish.
-
-The same workflow runs the test suite on every push and pull request; those
-runs never publish.
+**`publish` refuses to overwrite runs you don't have.** If the published
+`radar.db` contains a run your local database lacks, from an older CI run or
+another machine, publishing would silently discard it. `--force` overrides.
 
 ## The dashboard
 
@@ -306,6 +312,7 @@ radar save      mark items worth keeping
 radar dismiss   never show these again
 radar prune     delete items no recent run has seen (--dry-run to count)
 radar hydrate   backfill GitHub metadata for repos stored without it
+radar publish   build the report and push it to GitHub Pages
 radar doctor    check config, GitHub rate limits, Claude Code login
 ```
 

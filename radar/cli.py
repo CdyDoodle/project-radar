@@ -278,6 +278,34 @@ def cmd_hydrate(args) -> int:
     return 0
 
 
+def cmd_publish(args) -> int:
+    from radar import publish as pub
+    cfg, store = _open(config.load(args.home))
+    if not args.no_build:
+        report.build(cfg, store, feed_limit=args.limit)
+    try:
+        with console.status("preparing the site..." if args.dry_run else "publishing..."):
+            plan = pub.publish(cfg, store, remote=args.remote,
+                               dry_run=args.dry_run, force=args.force)
+    except pub.PublishConflict as exc:
+        console.print(f"[red]not published:[/] {exc}")
+        return 1
+    except pub.PublishError as exc:
+        console.print(f"[red]publish failed:[/] {exc}")
+        return 1
+    total = sum(plan.files.values())
+    console.print(f"{'would publish' if args.dry_run else '[green]published[/]'} "
+                  f"{len(plan.files)} files, {total / 1_048_576:.1f} MB, to the "
+                  f"gh-pages branch as one commit")
+    if plan.archived_as:
+        console.print(f"  previous page -> {plan.archived_as} ({plan.snapshots} archived)")
+    if plan.remote_runs:
+        console.print(f"  published corpus had {plan.remote_runs} runs, all present locally")
+    if plan.site_url:
+        console.print(f"  {plan.site_url}" + ("" if plan.pushed else "  (nothing pushed)"))
+    return 0
+
+
 def cmd_watch(args) -> int:
     cfg, _ = _open(config.load(args.home))
     users = cfg.watchlist
@@ -392,6 +420,16 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("dismiss", help="never show these again")
     s.add_argument("idents", nargs="+")
     s.set_defaults(fn=lambda a: cmd_verdict(a, "dismissed"))
+
+    s = sub.add_parser("publish", help="build the report and push it to GitHub Pages")
+    s.add_argument("--dry-run", action="store_true", help="prepare and check, push nothing")
+    s.add_argument("--force", action="store_true",
+                   help="overwrite a published corpus that has runs you lack")
+    s.add_argument("--no-build", action="store_true", help="publish out/ as it is")
+    s.add_argument("--remote", help="git remote URL (default: origin)")
+    s.add_argument("-n", "--limit", type=int, default=250,
+                   help="rows rendered into the page")
+    s.set_defaults(fn=cmd_publish)
 
     s = sub.add_parser("prune", help="delete items no recent run has seen")
     s.add_argument("--dry-run", action="store_true")
