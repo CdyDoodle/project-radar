@@ -232,7 +232,18 @@ def _inline_schema(model: type[BaseModel]) -> dict:
         if isinstance(node, dict):
             if "$ref" in node:
                 return walk(copy.deepcopy(defs[node["$ref"].split("/")[-1]]))
-            out = {k: walk(v) for k, v in node.items() if k != "title"}
+            out = {}
+            for k, v in node.items():
+                if k == "properties" and isinstance(v, dict):
+                    # Field names, not schema keywords: a field may be called
+                    # "title". Stripping it here once produced a schema that
+                    # required `title` while forbidding it, and every brief
+                    # was rejected.
+                    out[k] = {name: walk(sub) for name, sub in v.items()}
+                elif k == "title" and isinstance(v, str):
+                    continue          # pydantic's display label, not a field
+                else:
+                    out[k] = walk(v)
             if out.get("type") == "object":
                 out["additionalProperties"] = False
             return out
@@ -274,6 +285,13 @@ def run_claude(cfg: Config, exe: str, system: str, prompt: str,
         payload = raw.get("structured_output")
         if payload is None:
             payload = _json_from_text(raw.get("result") or "")
+        if payload is None:
+            # No answer at all. The model usually says why in plain text; that
+            # explanation is the only useful diagnostic, so carry it through.
+            said = " ".join(str(raw.get("result") or "").split())[:400]
+            last = ClaudeCodeError(f"no structured answer. Claude Code said: {said}")
+            log.warning("attempt %d: %s", attempt + 1, last)
+            continue
         try:
             return model.model_validate(payload)
         except ValidationError as exc:

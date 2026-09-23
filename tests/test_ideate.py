@@ -98,6 +98,19 @@ def test_invalid_answer_is_retried(store, cfg, monkeypatch):
     assert ideate.make_cards(cfg, store, limit=2) == 2
 
 
+def test_the_models_explanation_reaches_the_error(store, cfg, monkeypatch):
+    def refuses(args, stdin, timeout):
+        if args[1:3] == ["auth", "status"]:
+            return json.dumps({"loggedIn": True, "authMethod": "claude.ai"})
+        return json.dumps({"is_error": False, "result": "The schema contradicts itself on `title`."})
+    monkeypatch.setattr(ideate, "_invoke", refuses)
+    monkeypatch.setattr(ideate, "find_claude", lambda cfg: "claude")
+    seed(store, cfg)
+    exe = ideate.require_login(cfg)
+    with pytest.raises(ideate.ClaudeCodeError, match="contradicts itself"):
+        ideate.run_claude(cfg, exe, "sys", "prompt", ideate.BriefBundle)
+
+
 def test_not_logged_in_is_a_clear_error(store, cfg, monkeypatch):
     monkeypatch.setattr(ideate, "_invoke", FakeClaude(logged_in=False))
     monkeypatch.setattr(ideate, "find_claude", lambda cfg: "claude")
@@ -113,6 +126,30 @@ def test_no_tools_and_schema_are_passed(store, cfg, fake):
     schema = json.loads(args[args.index("--json-schema") + 1])
     assert "$defs" not in json.dumps(schema) and "$ref" not in json.dumps(schema)
     assert schema["additionalProperties"] is False
+
+
+def _satisfiable(schema, path="$"):
+    """Every required field is a defined property, all the way down."""
+    if isinstance(schema, dict):
+        props = schema.get("properties", {})
+        for name in schema.get("required", []):
+            assert name in props, f"{path}: requires {name!r} but does not define it"
+        for name, sub in props.items():
+            _satisfiable(sub, f"{path}.{name}")
+        if "items" in schema:
+            _satisfiable(schema["items"], f"{path}[]")
+
+
+@pytest.mark.parametrize("model", [ideate.CardBatch, ideate.BriefBundle])
+def test_schemas_are_satisfiable(model):
+    schema = ideate._inline_schema(model)
+    _satisfiable(schema)
+    assert "title" not in schema                      # the display label is gone...
+
+
+def test_a_field_named_title_survives():
+    brief = ideate._inline_schema(ideate.BriefBundle)["properties"]["briefs"]["items"]
+    assert "title" in brief["properties"] and "title" in brief["required"]   # ...the field is not
 
 
 def test_chinese_language_rule_reaches_the_prompt(store, cfg, fake):
