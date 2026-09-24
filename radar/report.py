@@ -112,6 +112,27 @@ tr.item:hover .acts button,.acts button:focus-visible,.acts button.done{opacity:
   </div>
 </header>
 
+{% if tracks %}
+<details class="hl" id="tracks" open>
+  <summary><span class="chev"></span> <span data-en="Your projects" data-zh="你的项目"></span>
+    <span class="hl-stat" data-en="{{ tracks|length }} tracked" data-zh="跟踪 {{ tracks|length }} 个"></span></summary>
+  <div class="hl-body" style="display:block">
+  {% for t in tracks %}
+    <div class="past-run">
+      <h3>{{ t.name }}<span data-en="{{ t.new|length }} new this run &middot; {{ t.hits|length }} total &middot; since {{ t.created_at[:10] }}" data-zh="本次新增 {{ t.new|length }} &middot; 共 {{ t.hits|length }} &middot; 自 {{ t.created_at[:10] }}"></span></h3>
+      {% for h in (t.new or t.hits)[:6] %}
+      <div class="past"><a href="{{ h.url }}"><b>{{ h.title[:110] }}</b></a>
+        {% if h.run == run_no %}<span class="tag th" data-en="new" data-zh="新"></span>{% endif %}
+        <span class="one">{{ h.reason }}</span></div>
+      {% else %}
+      <div class="past"><span class="one" data-en="Nothing found yet in radar, on GitHub or on arXiv." data-zh="radar、GitHub 和 arXiv 上都还没有发现相关内容。"></span></div>
+      {% endfor %}
+    </div>
+  {% endfor %}
+  </div>
+</details>
+{% endif %}
+
 {% if summary %}
 <div class="summary"><strong data-en="Where the board is pointing." data-zh="整体信号指向。"></strong> {{ summary }}</div>
 {% endif %}
@@ -824,6 +845,12 @@ def build(cfg: Config, store: Store, run_id: str | None = None,
     shown_run = briefs[0]["_run"] if briefs else run_id
     past = _past_briefs(store, shown_run)
     dives = store.dives_for([b["_id"] for b in briefs])
+    from radar import track as tk
+    run_no = store.current_fetch()
+    tracks = []
+    for t in tk.tracks(store):
+        t["new"] = tk.new_hits(t, run_no)
+        tracks.append(t)
     rows = _rows(store, cfg, feed_limit)
     since = store.run_started(run_id)
     highlights = _highlights(store, cfg, since)
@@ -848,7 +875,7 @@ def build(cfg: Config, store: Store, run_id: str | None = None,
     env = Environment(autoescape=True)
     html = env.from_string(TEMPLATE.replace("__CSS__", CSS)).render(
         generated=generated, run_id=run_id, briefs=briefs, past=past, rows=rows,
-        dives=dives, api=api_token,
+        dives=dives, api=api_token, tracks=tracks, run_no=run_no,
         source_names=source_names, theme_names=theme_names, languages=languages,
         theme_labels=themes.LABELS_ZH, lang=lang,
         axes=[{"id": a, "en": axis.label(a), "zh": axis.label(a, "zh")} for a in axis.ALL_AXES],

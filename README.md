@@ -331,6 +331,30 @@ yet. All 14 links it cited resolved.
 A dive is about as much usage as a full `radar run`. `radar dive --list` shows
 which briefs have been checked.
 
+## After you pick a project
+
+```bash
+.adar.cmd track add "code-map benchmark" --from-brief 8
+.adar.cmd track
+```
+
+Choosing is not the end of radar's job. On a year-long project the risk that
+matters is someone shipping it first, or a paper that changes the approach, and
+finding out three months late. A track is a named set of search phrases — by
+default the search terms a dive produced — and every `radar run` checks:
+
+- **radar's own corpus** for items matching two phrases, or every word of one;
+- **GitHub** for repos created since you started tracking;
+- **arXiv** for papers submitted since then.
+
+Dive phrases are search queries rather than exact strings, so matching uses the
+meaningful words of each phrase, not the literal phrase. The brief's own source
+repos are never reported as competitors. New hits sit at the top of the
+dashboard under **Your projects**; `radar track show <name>` lists them all and
+`radar track stop <name>` ends a track. GitHub searches are paced for its
+30-a-minute limit and arXiv's for its three-second rule, four phrases per track
+each, so a check takes a minute or two.
+
 ## The live local dashboard
 
 ```bash
@@ -419,6 +443,7 @@ radar serve     the dashboard on localhost, with working buttons
 radar tune      learn ranking weights from your saves and dismissals (--apply)
 radar gaps      papers checked to have no implementation
 radar watch     the watchlist: --suggest people, --add them
+radar track     watch a chosen project's space: add, list, show, check, stop
 radar prune     delete items no recent run has seen (--dry-run to count)
 radar hydrate   backfill GitHub metadata for repos stored without it
 radar publish   build the report and push it to GitHub Pages

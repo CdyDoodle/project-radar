@@ -305,6 +305,14 @@ recheck_days = 14
 effort = "high"
 timeout_seconds = 2400
 
+[track]
+# `radar track add "name" --from-brief 3` watches a chosen project's space on
+# every run: matching items in radar, repos created on GitHub since you
+# started, and new arXiv papers. GitHub searches are paced (about 2 seconds
+# each, up to 6 per track).
+search_github = true
+search_arxiv = true
+
 [report]
 # Default language of the dashboard and digest: "en" or "zh-CN". The page has
 # a toggle either way; this only picks what it shows first.

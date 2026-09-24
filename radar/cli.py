@@ -180,6 +180,13 @@ def cmd_run(args) -> int:
         n = collect.enrich(cfg, store, limit=int(cfg.get("brief.cards", 18)))
     console.print(f"[green]enrich[/]  {n} READMEs")
 
+    from radar import track as tk
+    if tk.tracks(store):
+        with console.status("checking your tracked projects for competitors..."):
+            found = tk.check_all(cfg, store, collect.make_http(cfg))
+        for name, n in found.items():
+            console.print(f"[green]track[/]   {name}: {n} new")
+
     if cfg.get("gaps.enabled", True):
         from radar import gaps as gp
         with console.status("checking top papers for existing code..."):
@@ -379,6 +386,75 @@ def cmd_gaps(args) -> int:
             m.get("arxiv_category", "")] if x)
         table.add_row(f"{r['score']:.2f}", f"[link={r['url']}]{r['title']}[/]\n[dim]{r['url']}[/]", sig)
     console.print(table)
+    return 0
+
+
+def cmd_track(args) -> int:
+    from radar import track as tk
+    cfg, store = _open(config.load(args.home))
+    if args.action == "add":
+        if not args.name:
+            console.print("[red]give the project a name[/]: radar track add \"my project\" ...")
+            return 1
+        keywords, brief_id = [], None
+        if args.from_brief:
+            from radar import dive as dv
+            brief = dv.resolve_brief(store, args.from_brief)
+            if not brief:
+                console.print(f"[red]no brief[/] {args.from_brief}")
+                return 1
+            brief_id = brief["_id"]
+            d = store.dives_for([brief_id]).get(brief_id)
+            if d and d.get("search_terms"):
+                keywords = d["search_terms"]
+            else:
+                console.print("[yellow]that brief has no dive yet[/] -- run `radar dive "
+                              f"{args.from_brief}` for good search terms, or pass --keywords")
+        if args.keywords:
+            keywords += [k for k in args.keywords.split(",")]
+        try:
+            tk.add(store, args.name, keywords, brief_id)
+        except ValueError as exc:
+            console.print(f"[red]{exc}[/]")
+            return 1
+        except Exception as exc:   # sqlite unique constraint
+            console.print(f"[red]could not add:[/] {exc}")
+            return 1
+        console.print(f"[green]tracking[/] {args.name}: {', '.join(k.strip() for k in keywords)}")
+        console.print("[dim]checked on every `radar run`, or now with `radar track check`[/]")
+        return 0
+    if args.action == "check":
+        found = tk.check_all(cfg, store, collect.make_http(cfg))
+        for name, n in found.items():
+            console.print(f"{name}: [green]{n}[/] new")
+        if not found:
+            console.print("no active tracks")
+        return 0
+    if args.action == "stop":
+        ok = tk.stop(store, args.name or "")
+        console.print("stopped" if ok else f"[red]no track[/] {args.name}")
+        return 0 if ok else 1
+    if args.action == "show":
+        t = tk.find(store, args.name or "")
+        if not t:
+            console.print(f"[red]no track[/] {args.name}")
+            return 1
+        console.print(f"[bold]{t['name']}[/]  [dim]since {t['created_at'][:10]}: "
+                      f"{', '.join(t['keywords'])}[/]")
+        for h in t["hits"][:args.limit]:
+            console.print(f"  [dim]{h['found_at'][:10]}[/] [link={h['url']}]{h['title'][:90]}[/]\n"
+                          f"      [dim]{h['reason']}[/]")
+        if not t["hits"]:
+            console.print("  nothing yet")
+        return 0
+    ts = tk.tracks(store)
+    if not ts:
+        console.print("no tracks. Start one: radar track add \"name\" --from-brief 3")
+    for t in ts:
+        new = len(tk.new_hits(t, store.current_fetch()))
+        console.print(f"  [bold]{t['name']}[/]  {len(t['hits'])} hits"
+                      + (f", [green]{new} new this run[/]" if new else "")
+                      + f"  [dim]{', '.join(t['keywords'][:5])}[/]")
     return 0
 
 
@@ -631,6 +707,15 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--recheck", action="store_true", help="check again even if checked recently")
     s.add_argument("--no-check", action="store_true", help="just list, no network")
     s.set_defaults(fn=cmd_gaps)
+
+    s = sub.add_parser("track", help="watch a chosen project's space for competitors")
+    s.add_argument("action", nargs="?", default="list",
+                   choices=["list", "add", "check", "show", "stop"])
+    s.add_argument("name", nargs="?")
+    s.add_argument("--from-brief", help="brief number or id; uses its dive's search terms")
+    s.add_argument("--keywords", help="comma-separated search phrases")
+    s.add_argument("-n", "--limit", type=int, default=30)
+    s.set_defaults(fn=cmd_track)
 
     s = sub.add_parser("prune", help="delete items no recent run has seen")
     s.add_argument("--dry-run", action="store_true")
