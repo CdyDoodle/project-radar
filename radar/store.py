@@ -114,7 +114,7 @@ def _migrate_2(conn: sqlite3.Connection) -> None:
 
     feedback   every save / dismiss / undo, with the item's score breakdown
                at that moment, so `radar tune` can learn what you meant
-    dives      verified deep-dives of a brief (`radar dive`)
+    dives      (no longer used; kept so old databases open unchanged)
     snapshots  one reading of an item's counters per run, for real velocity
     tracks     projects you have picked, watched for competitors
     track_hits what each track has found
@@ -426,35 +426,6 @@ class Store:
                ORDER BY f.id"""
         ).fetchall()
 
-    # -- dives ----------------------------------------------------------------
-    def add_dive(self, dive_id: str, brief_id: str, payload: dict) -> None:
-        self.conn.execute(
-            "INSERT OR REPLACE INTO dives (id, brief_id, created_at, payload) VALUES (?,?,?,?)",
-            (dive_id, brief_id, now().isoformat(), json.dumps(payload)))
-        self.conn.commit()
-
-    def dives_for(self, brief_ids: list[str]) -> dict[str, dict]:
-        """Newest dive per brief."""
-        if not brief_ids:
-            return {}
-        marks = ",".join("?" * len(brief_ids))
-        out: dict[str, dict] = {}
-        for r in self.conn.execute(
-                f"SELECT * FROM dives WHERE brief_id IN ({marks}) ORDER BY created_at",
-                brief_ids):
-            payload = json.loads(r["payload"])
-            payload["_id"], payload["_at"] = r["id"], r["created_at"]
-            out[r["brief_id"]] = payload
-        return out
-
-    def brief(self, brief_id: str) -> dict | None:
-        r = self.conn.execute("SELECT * FROM briefs WHERE id = ?", (brief_id,)).fetchone()
-        if not r:
-            return None
-        payload = json.loads(r["payload"])
-        payload["_id"], payload["_run"] = r["id"], r["run_id"]
-        return payload
-
     # -- translations -------------------------------------------------------------
     def translations(self, lang: str) -> dict[str, str]:
         return {r["src_hash"]: r["text"] for r in self.conn.execute(
@@ -523,32 +494,7 @@ class Store:
             "SELECT * FROM items WHERE id = ? OR key = ?", (ident, ident)
         ).fetchone()
 
-    # -- briefs & runs ---------------------------------------------------
-    def add_brief(self, brief_id: str, run_id: str, payload: dict) -> None:
-        self.conn.execute(
-            "INSERT OR REPLACE INTO briefs (id, run_id, created_at, payload) "
-            "VALUES (?,?,?,?)",
-            (brief_id, run_id, now().isoformat(), json.dumps(payload)),
-        )
-        self.conn.commit()
-
-    def briefs(self, run_id: str | None = None, limit: int = 50) -> list[dict]:
-        if run_id:
-            rows = self.conn.execute(
-                "SELECT * FROM briefs WHERE run_id = ? ORDER BY created_at", (run_id,)
-            ).fetchall()
-        else:
-            rows = self.conn.execute(
-                "SELECT * FROM briefs ORDER BY created_at DESC LIMIT ?", (limit,)
-            ).fetchall()
-        out = []
-        for r in rows:
-            payload = json.loads(r["payload"])
-            payload["_id"] = r["id"]
-            payload["_run"] = r["run_id"]
-            out.append(payload)
-        return out
-
+    # -- runs ------------------------------------------------------------
     def run_started(self, run_id: str | None) -> str | None:
         """ISO timestamp a run began, for 'what is new since then' queries.
 

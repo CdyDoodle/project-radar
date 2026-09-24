@@ -8,14 +8,6 @@ from radar import ideate, report
 from radar import translate as tl
 from tests.test_report import seed
 
-BRIEF = {"title": "Expert prefetching for MoE decode", "one_liner": "Predict experts ahead.",
-         "pitch": "A small predictor hides storage latency.", "why_now": "colibri exists.",
-         "hard_parts": ["Predictor recall at lookahead 3"], "you_will_learn": ["I/O scheduling"],
-         "milestones": ["Week 1-2: traces"], "prior_art": ["colibri"], "kill_criteria": "No gain.",
-         "effort_weeks": 8, "difficulty": 4, "novelty": 3, "ai_leverage": "subject",
-         "source_urls": [], "board_summary": "The board points at memory hierarchies."}
-
-
 class FakeClaude:
     def __init__(self):
         self.prompts = []
@@ -51,12 +43,10 @@ def test_translatable(text, ok):
 
 def test_page_content_is_translated_once_and_kept(store, cfg, fake):
     seed(store, cfg)
-    store.add_brief("r1-00", "r1", BRIEF)
     todo = tl.missing(cfg, store)
     assert "A columnar database engine" in todo            # feed description
     assert "Restroom Archive" in todo                       # headline title
     assert "a/infer" not in todo                            # repo names stay
-    assert "A small predictor hides storage latency." in todo
     st = tl.translate_missing(cfg, store)
     assert st["translated"] == st["needed"] == len(todo) and st["failed"] == 0
     assert tl.missing(cfg, store) == []                     # stored: nothing left
@@ -67,11 +57,11 @@ def test_page_content_is_translated_once_and_kept(store, cfg, fake):
     cfg.raw["report"] = {"language": "zh-CN"}
     page = report.build(cfg, store, run_id="r1")[0].read_text(encoding="utf-8")
     assert 'data-zh="中文：A columnar database engine"' in page
-    assert '>中文：A small predictor hides storage latency.<' in page   # shown by default
-    assert 'data-en="A small predictor hides storage latency."' in page  # English kept
+    assert '>中文：A columnar database engine<' in page           # shown by default
+    assert 'data-en="A columnar database engine"' in page          # English kept
     assert "中文：restroom archive" in page                 # searchable in Chinese
     md = (cfg.out_dir / next(p.name for p in cfg.out_dir.glob("digest-*.md"))).read_text(encoding="utf-8")
-    assert "中文：A small predictor hides storage latency." in md
+    assert "中文：A columnar database engine" in md                # the digest is Chinese too
 
 
 def test_untranslated_content_falls_back_to_english(store, cfg):

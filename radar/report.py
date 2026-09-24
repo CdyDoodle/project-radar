@@ -79,8 +79,8 @@ def _metrics_line(metrics: dict) -> dict:
 def _reason(item, sources: list[str], is_new: bool, signals: dict | None = None) -> dict:
     """Why this item is worth a glance, built from signals already computed.
 
-    Deterministic on purpose: the briefs section needs Claude Code, and the
-    summary at the top of the page should still say something useful without it.
+    Deterministic on purpose: it has to say something useful without any
+    Claude Code pass having run.
     """
     en, zh = [], []
     if is_new:
@@ -261,23 +261,6 @@ def _rows(store: Store, cfg: Config, limit: int) -> list[dict]:
     return out
 
 
-def _run_date(run_id: str) -> str:
-    try:
-        return datetime.strptime(run_id[:8], "%Y%m%d").strftime("%Y-%m-%d")
-    except ValueError:
-        return run_id
-
-
-def _past_briefs(store: Store, current_run: str, max_runs: int = 5) -> list[dict]:
-    """Briefs from earlier runs, newest run first, so ideas aren't lost."""
-    groups: dict[str, list[dict]] = {}
-    for b in store.briefs(limit=200):
-        if b["_run"] != current_run:
-            groups.setdefault(b["_run"], []).append(b)
-    runs = sorted(groups, reverse=True)[:max_runs]
-    return [{"run": r, "date": _run_date(r), "briefs": groups[r]} for r in runs]
-
-
 def build(cfg: Config, store: Store, run_id: str | None = None,
           feed_limit: int = 250, api_token: str | None = None,
           record: set | None = None) -> tuple[Path, Path]:
@@ -293,18 +276,6 @@ def build(cfg: Config, store: Store, run_id: str | None = None,
     tr = Translator(store, record)
     lang = norm_lang(cfg.get("report.language", "en"))
     run_id = run_id or store.latest_run() or "adhoc"
-    briefs = store.briefs(run_id=run_id)
-    if not briefs:
-        # A run without briefs (--no-llm, a quick rerun) shows the latest run
-        # that has them, in their own order: the numbers on the page must match
-        # `radar dive <n>`. The old fallback took the newest N across runs,
-        # newest first, which reversed them.
-        latest = store.conn.execute(
-            "SELECT run_id FROM briefs ORDER BY created_at DESC LIMIT 1").fetchone()
-        briefs = store.briefs(run_id=latest["run_id"]) if latest else []
-    shown_run = briefs[0]["_run"] if briefs else run_id
-    past = _past_briefs(store, shown_run)
-    dives = store.dives_for([b["_id"] for b in briefs])
     from radar import track as tk
     run_no = store.current_fetch()
     tracks = []
@@ -321,6 +292,7 @@ def build(cfg: Config, store: Store, run_id: str | None = None,
         "infra": counts_axis.get("ai-infra", 0),
         "applied": counts_axis.get("ai-application", 0),
         "nonai": counts_axis.get("non-ai", 0),
+        "agree": sum(1 for r in rows if len(r["sources"]) > 1),
     }
     source_names = sorted({s for r in rows for s in r["sources"]})
     theme_ids = sorted({t for r in rows for t in r["themes"]})
@@ -348,13 +320,12 @@ def build(cfg: Config, store: Store, run_id: str | None = None,
 
     env.globals.update(T=T, TT=TT, tr=tr)
     html = env.from_string(TEMPLATE.replace("__CSS__", CSS)).render(
-        generated=generated, run_id=run_id, briefs=briefs, past=past, rows=rows,
-        dives=dives, api=api_token, tracks=tracks, run_no=run_no,
+        generated=generated, run_id=run_id, rows=rows,
+        api=api_token, tracks=tracks, run_no=run_no,
         source_names=source_names, theme_names=theme_names, languages=languages,
         theme_labels=themes.LABELS_ZH, lang=lang,
         axes=[{"id": a, "en": axis.label(a), "zh": axis.label(a, "zh")} for a in axis.ALL_AXES],
-        stats=stats, summary=(briefs[0].get("board_summary") if briefs else ""),
-        highlights=highlights, mix=mix,
+        stats=stats, highlights=highlights, mix=mix,
     )
     if record is not None:
         return None, None
@@ -368,7 +339,7 @@ def build(cfg: Config, store: Store, run_id: str | None = None,
     html_path.write_text(html, encoding="utf-8")
 
     md_path = cfg.out_dir / f"digest-{datetime.now():%Y-%m-%d}.md"
-    md_path.write_text(_markdown(briefs, rows, generated, highlights, mix, lang,
+    md_path.write_text(_markdown(rows, generated, highlights, mix, lang,
                                  (lambda t: (tr(t) or t) if t else t) if lang == "zh" else None),
                        encoding="utf-8")
     return html_path, md_path
@@ -376,21 +347,19 @@ def build(cfg: Config, store: Store, run_id: str | None = None,
 
 MD = {
     "en": {"digest": "radar digest", "new": "new", "infra": "AI infra", "applied": "AI applied",
-           "nonai": "no AI", "worth": "Worth a look", "briefs": "Project briefs",
-           "difficulty": "difficulty", "novelty": "novelty", "weeks": "weeks",
+           "nonai": "no AI", "worth": "Worth a look", "difficulty": "difficulty", "novelty": "novelty", "weeks": "weeks",
            "why_now": "Why now.", "hard": "Hard parts", "learn": "You will learn",
            "milestones": "Milestones", "prior": "Prior art", "kill": "Kill criteria.",
            "sources": "Sources", "ranked": "Ranked signal"},
     "zh": {"digest": "radar 摘要", "new": "本次新增", "infra": "AI 基础设施", "applied": "AI 应用",
-           "nonai": "非 AI", "worth": "值得一看", "briefs": "项目简报",
-           "difficulty": "难度", "novelty": "新颖度", "weeks": "周",
+           "nonai": "非 AI", "worth": "值得一看", "difficulty": "难度", "novelty": "新颖度", "weeks": "周",
            "why_now": "为什么是现在。", "hard": "难点", "learn": "你会学到",
            "milestones": "里程碑", "prior": "已有工作", "kill": "放弃标准。",
            "sources": "来源", "ranked": "排名信号"},
 }
 
 
-def _markdown(briefs: list[dict], rows: list[dict], generated: str,
+def _markdown(rows: list[dict], generated: str,
               highlights: list[dict] | None = None, mix: dict | None = None,
               lang: str = "en", tr=None) -> str:
     W = MD.get(lang, MD["en"])
@@ -412,27 +381,6 @@ def _markdown(briefs: list[dict], rows: list[dict], generated: str,
                     L.append(f"  <br>{t(it['summary'][:150])}")
             L.append("")
         L += ["</details>", "", "---", ""]
-    if briefs and briefs[0].get("board_summary"):
-        L += ["> " + t(briefs[0]["board_summary"]), ""]
-    if briefs:
-        L += [f"## {W['briefs']}", ""]
-        for i, b in enumerate(briefs, 1):
-            weeks = (f"约 {b['effort_weeks']} 周" if lang == "zh"
-                     else f"~{b['effort_weeks']} weeks")
-            L += [
-                f"### {i}. {t(b['title'])}",
-                f"*{t(b['one_liner'])}*", "",
-                f"`{W['difficulty']} {b['difficulty']}/5`  `{W['novelty']} {b['novelty']}/5`  "
-                f"`{weeks}`", "",
-                t(b["pitch"]), "",
-                f"**{W['why_now']}** {t(b['why_now'])}", "",
-                f"**{W['hard']}**", *[f"- {t(h)}" for h in b["hard_parts"]], "",
-                f"**{W['learn']}**", *[f"- {t(h)}" for h in b["you_will_learn"]], "",
-                f"**{W['milestones']}**", *[f"- {t(m)}" for m in b["milestones"]], "",
-                f"**{W['prior']}**", *[f"- {t(p)}" for p in b["prior_art"]], "",
-                f"**{W['kill']}** {t(b['kill_criteria'])}", "",
-                f"**{W['sources']}**", *[f"- {u}" for u in b["source_urls"]], "", "---", "",
-            ]
     # Group the digest by theme -- reads far better than a flat 60-row table.
     L += [f"## {W['ranked']}", ""]
     by_theme: dict[str, list[dict]] = {}

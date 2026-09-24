@@ -7,8 +7,8 @@
 ####################################################################
 
 [profile]
-# Free text. This goes into the ideation prompt verbatim, so be specific
-# about what you know, what you want to learn, and what you'd hate building.
+# Free text about you. Not read by anything at the moment: it fed the
+# project briefs, which were removed. Kept for reference.
 description = """
 Senior software engineer taking a deliberate gap year. Strong general
 engineering background; wants to go deep rather than wide. Looking for projects
@@ -252,37 +252,38 @@ domains = ["github.com", "arxiv.org"]
 # queries = ["inference engine", "compiler", "database internals"]
 
 ####################################################################
-# Ideation, through Claude Code
+# Claude Code
 #
-# `radar cards` / `radar brief` (and `radar run` without --no-llm) call the
-# Claude Code CLI in headless mode with your existing Claude login. No API
-# key is used; one set in the environment is withheld from Claude Code.
-# Sign in once by running `claude` and typing /login. Check with
-# `radar doctor`. Each run counts against your Claude plan's usage limits.
+# Signal cards and translation call the Claude Code CLI in headless mode
+# with your existing Claude login. No API key is used; one set in the
+# environment is withheld from Claude Code. Sign in once by running
+# `claude` and typing /login; check with `radar doctor`. Runs count against
+# your Claude plan's usage limits.
 ####################################################################
 
-[brief]
+[claude]
 # Empty = Claude Code's default model. Aliases like "opus" or "sonnet" work.
 model = ""
-# low | medium | high | xhigh | max
-effort = "high"
-# "en" or "zh-CN" (Simplified Chinese) for cards and briefs. Names, URLs and
-# technical terms stay as written.
-language = "en"
-# How many top-ranked items get a signal card, and how many go in one call.
-cards = 18
-cards_per_call = 6
-# Parallel Claude Code processes for the card pass.
-max_workers = 3
-# Cards older than this are redone, so a repo that changed gets re-read.
-card_ttl_days = 60
-# How many project briefs to synthesize from those cards.
-count = 8
-readme_chars = 8000
 timeout_seconds = 1200
 # Leave unset to find `claude` on PATH, or the copy bundled with the Claude
 # desktop app on Windows.
 # claude_path = "C:/path/to/claude.exe"
+
+[cards]
+# Claude reads the top-ranked items and writes a card for each: what it
+# really is, how deep the engineering goes, and whether it is a thin wrapper
+# or marketing. Thin and shallow items are pushed down the ranking.
+count = 18
+per_call = 6
+max_workers = 3
+# low | medium | high | xhigh | max
+effort = "high"
+# "en" or "zh-CN" for the card text itself.
+language = "en"
+# Cards older than this are redone, so a repo that changed gets re-read.
+ttl_days = 60
+# How much of each README the card pass reads.
+readme_chars = 8000
 
 [publish]
 # Archived pages younger than this are all kept; older ones are thinned to
@@ -298,15 +299,8 @@ enabled = true
 check = 25
 recheck_days = 14
 
-[dive]
-# `radar dive <n>` gives Claude Code web search and fetch to check a brief:
-# existing implementations, real novelty, a runnable two-week experiment.
-# One dive is roughly as much usage as a full `radar run`.
-effort = "high"
-timeout_seconds = 2400
-
 [track]
-# `radar track add "name" --from-brief 3` watches a chosen project's space on
+# `radar track add "name" --keywords "a,b"` watches a project's space on
 # every run: matching items in radar, repos created on GitHub since you
 # started, and new arXiv papers. GitHub searches are paced (about 2 seconds
 # each, up to 6 per track).
@@ -314,9 +308,9 @@ search_github = true
 search_arxiv = true
 
 [translate]
-# Content in Simplified Chinese: item descriptions, paper and headline titles,
-# briefs, dives and track hits, translated through Claude Code during
-# `radar run` (and after each dive). Each string is translated once and
+# Content in Simplified Chinese: item descriptions, paper and headline titles
+# and track hits, translated through Claude Code during `radar run`. Each
+# string is translated once and
 # stored; later runs only send what is new. English is kept, and the page's
 # language toggle switches content too.
 enabled = true

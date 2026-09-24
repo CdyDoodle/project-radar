@@ -1,8 +1,8 @@
 """`radar serve`: the dashboard, live, on your own machine.
 
 The published page is static, so its save and dismiss buttons can only copy a
-command. Served locally they write straight to the database, notes can be
-added, and a brief can be sent for a dive with one click.
+command. Served locally they write straight to the database, and notes can be
+added to any item.
 
 Local only, and defended as if it weren't:
 - binds 127.0.0.1, never all interfaces;
@@ -33,7 +33,7 @@ MAX_BODY = 64 * 1024
 
 
 class App:
-    """State shared by all requests: config, token, the page, dive jobs."""
+    """State shared by all requests: config, token, the page."""
 
     def __init__(self, cfg: Config, port: int, token: str | None = None):
         self.cfg = cfg
@@ -43,7 +43,6 @@ class App:
         self.lock = threading.Lock()
         self.dirty = True
         self.page: bytes = b""
-        self.jobs: dict[str, dict] = {}
 
     def html(self) -> bytes:
         with self.lock:
@@ -53,39 +52,6 @@ class App:
                 self.page = Path(path).read_bytes()
                 self.dirty = False
             return self.page
-
-    def start_dive(self, brief_id: str) -> dict:
-        from radar import dive as dv
-        with self.lock:
-            job = self.jobs.get(brief_id)
-            if job and job["state"] == "running":
-                return job
-            job = {"state": "running", "error": ""}
-            self.jobs[brief_id] = job
-
-        def work():
-            try:
-                store = open_store(self.cfg)
-                brief = store.brief(brief_id)
-                if not brief:
-                    raise ValueError(f"no brief {brief_id}")
-                dv.dive(self.cfg, store, brief)
-                if self.cfg.get("translate.enabled", True):
-                    from radar import translate as tl
-                    try:
-                        tl.translate_missing(self.cfg, store)
-                    except BaseException as exc:      # the dive itself succeeded
-                        log.warning("translating the dive failed: %s", exc)
-                job["state"] = "done"
-            except BaseException as exc:          # SystemExit from require_login too
-                job["state"], job["error"] = "failed", str(exc)[:300]
-                log.warning("dive %s failed: %s", brief_id, exc)
-            finally:
-                self.dirty = True
-
-        threading.Thread(target=work, name=f"dive-{brief_id}", daemon=True).start()
-        return job
-
 
 def make_handler(app: App):
     class Handler(BaseHTTPRequestHandler):
@@ -130,10 +96,6 @@ def make_handler(app: App):
             path = self.path.split("?", 1)[0]
             if path in ("/", "/index.html"):
                 return self._send(200, app.html(), "text/html; charset=utf-8")
-            if path == "/api/jobs":
-                if not self._authorised():
-                    return self._send(403, b"forbidden", "text/plain")
-                return self._json(200, app.jobs)
             return self._send(404, b"not found", "text/plain")
 
         def do_POST(self):
@@ -159,11 +121,6 @@ def make_handler(app: App):
                     return self._send(404, b"no such item", "text/plain")
                 app.dirty = True
                 return self._json(200, {"ok": True})
-            if path == "/api/dive":
-                brief_id = str(body.get("brief") or "")
-                if not store.brief(brief_id):
-                    return self._send(404, b"no such brief", "text/plain")
-                return self._json(202, app.start_dive(brief_id))
             return self._send(404, b"not found", "text/plain")
 
     return Handler

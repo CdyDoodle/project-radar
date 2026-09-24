@@ -13,13 +13,6 @@ CARD = {"what_it_is": "An inference server.", "technical_depth": 4,
         "depth_reason": "custom kv cache", "frontier": "multi-node",
         "adjacent_ideas": ["a", "b"], "low_substance": False}
 
-BRIEF = {"title": "T", "one_liner": "o", "pitch": "p", "why_now": "w",
-         "hard_parts": ["h"], "you_will_learn": ["l"], "milestones": ["Week 1-2: x"],
-         "prior_art": ["none"], "kill_criteria": "k", "effort_weeks": 4,
-         "difficulty": 3, "novelty": 4, "ai_leverage": "tool",
-         "source_urls": ["https://github.com/a/infer"]}
-
-
 class FakeClaude:
     """Stands in for `_invoke`: answers auth checks and structured calls."""
 
@@ -45,8 +38,9 @@ class FakeClaude:
                       "technical_depth": 1 if i in self.shallow else 4,
                       "low_substance": i in self.shallow} for i in ids]
             return json.dumps({"is_error": False, "structured_output": {"cards": cards}})
+        # A plain-text JSON answer (no structured_output) must be accepted too.
         return json.dumps({"is_error": False, "result": "```json\n" + json.dumps(
-            {"briefs": [BRIEF, {**BRIEF, "title": "T2"}], "board_summary": "s"}) + "\n```"})
+            {"id": "x", "what_it_is": "y"}) + "\n```"})
 
 
 @pytest.fixture
@@ -57,15 +51,12 @@ def fake(monkeypatch, cfg):
     return f
 
 
-def test_cards_then_briefs(store, cfg, fake):
+def test_cards_are_written(store, cfg, fake):
     seed(store, cfg)
-    assert ideate.make_cards(cfg, store) == 3        # brief.cards = 3 in the test config
+    assert ideate.make_cards(cfg, store) == 3        # cards.count = 3 in the test config
     carded = [r for r in store.items() if r["card"]]
     assert len(carded) == 3
     assert all(json.loads(r["card"])["carded_at"] for r in carded)
-    briefs = ideate.make_briefs(cfg, store, "r1")
-    assert [b["title"] for b in briefs] == ["T", "T2"]
-    assert store.briefs(run_id="r1")[0]["board_summary"] == "s"
 
 
 def test_fresh_cards_are_not_redone(store, cfg, fake):
@@ -108,7 +99,7 @@ def test_the_models_explanation_reaches_the_error(store, cfg, monkeypatch):
     seed(store, cfg)
     exe = ideate.require_login(cfg)
     with pytest.raises(ideate.ClaudeCodeError, match="contradicts itself"):
-        ideate.run_claude(cfg, exe, "sys", "prompt", ideate.BriefBundle)
+        ideate.run_claude(cfg, exe, "sys", "prompt", ideate.CardBatch)
 
 
 def test_token_refresh_race_is_waited_out(store, cfg, monkeypatch):
@@ -150,7 +141,7 @@ def test_first_card_batch_runs_before_the_rest(store, cfg, monkeypatch):
 
     monkeypatch.setattr(ideate, "_invoke", tracked)
     monkeypatch.setattr(ideate, "find_claude", lambda cfg: "claude")
-    cfg.raw["brief"]["cards_per_call"] = 1
+    cfg.raw["cards"]["per_call"] = 1
     seed(store, cfg)
     ideate.make_cards(cfg, store)
     assert order[0][0] == "start" and order[1][0] == "end"   # batch 1 finished alone
@@ -185,7 +176,7 @@ def _satisfiable(schema, path="$"):
             _satisfiable(schema["items"], f"{path}[]")
 
 
-@pytest.mark.parametrize("model", [ideate.CardBatch, ideate.BriefBundle])
+@pytest.mark.parametrize("model", [ideate.CardBatch])
 def test_schemas_are_satisfiable(model):
     schema = ideate._inline_schema(model)
     _satisfiable(schema)
@@ -193,12 +184,18 @@ def test_schemas_are_satisfiable(model):
 
 
 def test_a_field_named_title_survives():
-    brief = ideate._inline_schema(ideate.BriefBundle)["properties"]["briefs"]["items"]
-    assert "title" in brief["properties"] and "title" in brief["required"]   # ...the field is not
+    from pydantic import BaseModel
+
+    class Titled(BaseModel):
+        title: str
+        body: str
+
+    schema = ideate._inline_schema(Titled)
+    assert "title" in schema["properties"] and "title" in schema["required"]   # ...the field is not
 
 
 def test_chinese_language_rule_reaches_the_prompt(store, cfg, fake):
-    cfg.raw["brief"]["language"] = "zh-CN"
+    cfg.raw["cards"]["language"] = "zh-CN"
     seed(store, cfg)
     ideate.make_cards(cfg, store, limit=1)
     args = next(a for a, _ in fake.calls if "-p" in a)

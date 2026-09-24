@@ -130,25 +130,9 @@ def cmd_enrich(args) -> int:
 def cmd_cards(args) -> int:
     from radar import ideate
     cfg, store = _open(config.load(args.home))
-    with console.status("reading items (pass A)..."):
+    with console.status("reading the top items with Claude Code..."):
         n = ideate.make_cards(cfg, store, limit=args.limit)
     console.print(f"[green]{n}[/] signal cards written")
-    return 0
-
-
-def cmd_brief(args) -> int:
-    from radar import ideate
-    cfg, store = _open(config.load(args.home))
-    run_id = args.run or _run_id()
-    store.start_run(run_id)
-    with console.status("synthesizing project briefs (pass B)..."):
-        briefs = ideate.make_briefs(cfg, store, run_id)
-    for i, b in enumerate(briefs, 1):
-        console.print(f"\n[bold]{i}. {b['title']}[/]")
-        console.print(f"   [italic]{b['one_liner']}[/]")
-        console.print(f"   [dim]difficulty {b['difficulty']}/5 · novelty {b['novelty']}/5 "
-                      f"· ~{b['effort_weeks']}w[/]")
-    console.print(f"\n[green]{len(briefs)}[/] briefs stored under run {run_id}")
     return 0
 
 
@@ -177,7 +161,7 @@ def cmd_run(args) -> int:
     console.print("[green]rank[/]    scored")
 
     with console.status("3/5 fetching READMEs..."):
-        n = collect.enrich(cfg, store, limit=int(cfg.get("brief.cards", 18)))
+        n = collect.enrich(cfg, store, limit=int(cfg.get("cards.count", 18)))
     console.print(f"[green]enrich[/]  {n} READMEs")
 
     from radar import track as tk
@@ -200,13 +184,10 @@ def cmd_run(args) -> int:
         # The feed and report never depend on Claude Code: if it is missing or
         # signed out, say so and publish everything else.
         try:
-            with console.status("4/5 triaging items with Claude Code (pass A)..."):
+            with console.status("reading the top items with Claude Code..."):
                 cards = ideate.make_cards(cfg, store)
             console.print(f"[green]cards[/]   {cards}")
             rank.rank_all(store, cfg)   # fold new card penalties into the scores
-            with console.status("5/5 synthesizing project briefs (pass B)..."):
-                briefs = ideate.make_briefs(cfg, store, run_id)
-            console.print(f"[green]briefs[/]  {len(briefs)}")
         except (SystemExit, ideate.ClaudeCodeError) as exc:
             console.print(f"[yellow]skipping Claude passes:[/] {exc}")
 
@@ -268,52 +249,6 @@ def cmd_verdict(args, status: str) -> int:
     if getattr(args, "note", None):
         for i in args.idents:
             store.set_note(i, args.note)
-    return 0
-
-
-def cmd_dive(args) -> int:
-    from radar import dive as dv
-    cfg, store = _open(config.load(args.home))
-    if args.list or not args.brief:
-        run_id = args.run or dv._current_run(store)
-        briefs = store.briefs(run_id=run_id) if run_id else []
-        if not briefs:
-            console.print("no briefs yet -- run `radar run` (or `radar brief`) first")
-            return 1
-        dives = store.dives_for([b["_id"] for b in briefs])
-        console.print(f"[dim]briefs from run {run_id}; `radar dive <n>` checks one[/]")
-        for i, b in enumerate(briefs, 1):
-            d = dives.get(b["_id"])
-            mark = (f"[green]{d['verdict']}[/] novelty {d['novelty_revised']}/5" if d
-                    else "[dim]not checked[/]")
-            console.print(f"  {i}. {b['title'][:70]}  [{mark}]")
-        return 0
-    brief = dv.resolve_brief(store, args.brief, args.run)
-    if not brief:
-        console.print(f"[red]no brief[/] {args.brief}")
-        return 1
-    console.print(f"checking [bold]{brief['title']}[/]")
-    console.print("[dim]Claude Code will search the web; this usually takes several minutes[/]")
-    with console.status("searching for prior art..."):
-        rep = dv.dive(cfg, store, brief)
-    colour = {"go": "green", "pivot": "yellow", "crowded": "red", "kill": "red"}[rep["verdict"]]
-    console.print(f"\n[bold {colour}]{rep['verdict'].upper()}[/]  novelty "
-                  f"{brief.get('novelty')}/5 -> {rep['novelty_revised']}/5")
-    console.print(f"  {rep['verdict_reason']}")
-    if rep["prior_art"]:
-        console.print("\n[dim]prior art[/]")
-        for a in rep["prior_art"]:
-            ok = "[green]ok[/]" if a["verified"] else "[red]link failed[/]"
-            console.print(f"  {ok} [{a['closeness']}] {a['name']}  {a['url']}")
-    x = rep["two_week_experiment"]
-    console.print(f"\n[dim]two-week experiment[/]  {x['goal']}")
-    for st in x["steps"]:
-        console.print(f"  · {st}")
-    console.print(f"  [dim]kill if:[/] {x['kill_threshold']}")
-    console.print(f"\n[green]stored[/] {rep['_id']}  ({rep['links_checked']} links checked, "
-                  f"{rep['links_unverified']} failed)")
-    if cfg.get("translate.enabled", True):
-        _translate(cfg, store)
     return 0
 
 
@@ -400,24 +335,12 @@ def cmd_track(args) -> int:
         if not args.name:
             console.print("[red]give the project a name[/]: radar track add \"my project\" ...")
             return 1
-        keywords, brief_id = [], None
-        if args.from_brief:
-            from radar import dive as dv
-            brief = dv.resolve_brief(store, args.from_brief)
-            if not brief:
-                console.print(f"[red]no brief[/] {args.from_brief}")
-                return 1
-            brief_id = brief["_id"]
-            d = store.dives_for([brief_id]).get(brief_id)
-            if d and d.get("search_terms"):
-                keywords = d["search_terms"]
-            else:
-                console.print("[yellow]that brief has no dive yet[/] -- run `radar dive "
-                              f"{args.from_brief}` for good search terms, or pass --keywords")
-        if args.keywords:
-            keywords += [k for k in args.keywords.split(",")]
+        keywords = [k for k in (args.keywords or "").split(",") if k.strip()]
+        if not keywords:
+            console.print("[red]give it search phrases[/]: --keywords \"moe offload,expert prefetching\"")
+            return 1
         try:
-            tk.add(store, args.name, keywords, brief_id)
+            tk.add(store, args.name, keywords)
         except ValueError as exc:
             console.print(f"[red]{exc}[/]")
             return 1
@@ -453,7 +376,7 @@ def cmd_track(args) -> int:
         return 0
     ts = tk.tracks(store)
     if not ts:
-        console.print("no tracks. Start one: radar track add \"name\" --from-brief 3")
+        console.print("no tracks. Start one: radar track add \"name\" --keywords \"a,b\"")
     for t in ts:
         new = len(tk.new_hits(t, store.current_fetch()))
         console.print(f"  [bold]{t['name']}[/]  {len(t['hits'])} hits"
@@ -613,8 +536,8 @@ def cmd_doctor(args) -> int:
     from radar import ideate
     st = ideate.auth_status(cfg)
     if not st.get("found"):
-        console.print("claude     [yellow]not found -- `cards`/`brief` will not run "
-                      "(set brief.claude_path)[/]")
+        console.print("claude     [yellow]not found -- cards and translation will not run "
+                      "(set claude.claude_path)[/]")
     elif not st.get("loggedIn"):
         console.print(f"claude     [yellow]not logged in -- run `claude`, then /login[/]\n"
                       f"           {st['path']}")
@@ -623,7 +546,7 @@ def cmd_doctor(args) -> int:
                       f"           {st['path']}")
     if os.environ.get("ANTHROPIC_API_KEY"):
         console.print("           [dim]ANTHROPIC_API_KEY is set; radar withholds it from "
-                      "Claude Code so briefs use your Claude login[/]")
+                      "Claude Code so it uses your Claude login[/]")
     fb = store.feedback()
     n_saved = sum(1 for r in fb if r["action"] == "saved")
     console.print(f"feedback   {n_saved} saved, {len(fb) - n_saved} dismissed "
@@ -666,13 +589,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("-n", "--limit", type=int, default=25)
     s.set_defaults(fn=cmd_enrich)
 
-    s = sub.add_parser("cards", help="Claude Code pass A: triage top items")
+    s = sub.add_parser("cards", help="Claude Code: read the top items and card them")
     s.add_argument("-n", "--limit", type=int)
     s.set_defaults(fn=cmd_cards)
 
-    s = sub.add_parser("brief", help="Claude Code pass B: synthesize project briefs")
-    s.add_argument("--run")
-    s.set_defaults(fn=cmd_brief)
 
     s = sub.add_parser("report", help="build the HTML dashboard + markdown digest")
     s.add_argument("--run")
@@ -681,7 +601,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--no-open", action="store_true")
     s.set_defaults(fn=cmd_report)
 
-    s = sub.add_parser("run", help="fetch + rank + enrich + brief + report")
+    s = sub.add_parser("run", help="fetch + rank + enrich + cards + report")
     s.add_argument("-n", "--limit", type=int, default=250,
                    help="rows rendered into the page (the UI pages client-side)")
     s.add_argument("--no-llm", action="store_true", help="skip the Claude Code passes")
@@ -715,12 +635,6 @@ def build_parser() -> argparse.ArgumentParser:
                    help="rows rendered into the page")
     s.set_defaults(fn=cmd_publish)
 
-    s = sub.add_parser("dive", help="check a brief against the web with Claude Code")
-    s.add_argument("brief", nargs="?", help="brief number on the page (1, 2, ...) or brief id")
-    s.add_argument("--run", help="pick the brief from this run instead of the latest")
-    s.add_argument("--list", action="store_true", help="list briefs and their dive status")
-    s.set_defaults(fn=cmd_dive)
-
     s = sub.add_parser("serve", help="the dashboard on localhost, with working buttons")
     s.add_argument("--port", type=int, default=8766)
     s.add_argument("--no-open", action="store_true")
@@ -743,7 +657,6 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("action", nargs="?", default="list",
                    choices=["list", "add", "check", "show", "stop"])
     s.add_argument("name", nargs="?")
-    s.add_argument("--from-brief", help="brief number or id; uses its dive's search terms")
     s.add_argument("--keywords", help="comma-separated search phrases")
     s.add_argument("-n", "--limit", type=int, default=30)
     s.set_defaults(fn=cmd_track)

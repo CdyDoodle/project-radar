@@ -1,8 +1,8 @@
 """Simplified Chinese for the content, not just the interface.
 
 The dashboard's interface strings are bilingual in the template. The content
--- item descriptions, paper and headline titles, briefs, dives, the board
-summary, track hits -- comes from GitHub, arXiv, HN and Claude in English.
+-- item descriptions, paper and headline titles, track hits -- comes from
+GitHub, arXiv and HN in English.
 This translates it through Claude Code, the same way the other passes run.
 
 How it stays cheap and consistent:

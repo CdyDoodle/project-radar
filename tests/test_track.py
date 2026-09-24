@@ -82,13 +82,6 @@ def test_github_and_arxiv_only_report_new_things(store, cfg, monkeypatch):
     assert hits["arxiv:2609.11111"]["title"] == "New Prefetching"
 
 
-def test_brief_sources_are_not_competitors(store):
-    store.upsert(repo("a/infer", "expert prefetching engine"))
-    store.add_brief("r1-00", "r1", {"title": "b", "source_urls": ["https://github.com/a/infer"]})
-    tk.add(store, "p", ["expert prefetching"], brief_id="r1-00")
-    assert tk.match_corpus(store, tk.tracks(store)[0]) == 0
-
-
 def test_dashboard_shows_tracks(store, cfg):
     s = store.begin_fetch()
     store.upsert(repo("a/moe-offload", "x"), s)

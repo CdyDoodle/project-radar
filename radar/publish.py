@@ -1,7 +1,8 @@
 """Publish the local dashboard, digest and corpus to GitHub Pages.
 
-Your machine is the source of truth: briefs can only be generated here
-(they need a Claude Code login), so the site is published from here too.
+Your machine is the source of truth: the Claude Code passes (cards and
+translation) need a login that only exists here, so the site is published from
+here too.
 
 What lands on the `gh-pages` branch:
 

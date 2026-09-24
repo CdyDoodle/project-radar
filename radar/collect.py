@@ -104,7 +104,7 @@ def enrich(cfg: Config, store: Store, http: Http | None = None,
 
     def one(row):
         text = fetch_readme(http, row["key"][3:],
-                            max_chars=int(cfg.get("brief.readme_chars", 8000)))
+                            max_chars=int(cfg.get("cards.readme_chars", 8000)))
         return row["id"], text
 
     count = 0

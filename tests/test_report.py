@@ -64,28 +64,8 @@ def test_saved_lane_and_famous_repos_kept_out_of_fastest(store, cfg):
     assert "d/huge" not in fastest and "a/infer" in fastest   # 250k stars is mega
 
 
-def test_earlier_briefs_are_listed(store, cfg):
+def test_no_project_briefs_on_the_page(store, cfg):
     seed(store, cfg)
-    brief = {"title": "Old idea", "one_liner": "o", "difficulty": 3, "novelty": 2,
-             "effort_weeks": 4, "pitch": "", "why_now": "", "hard_parts": [],
-             "you_will_learn": [], "milestones": [], "prior_art": [], "kill_criteria": "",
-             "ai_leverage": "", "source_urls": []}
-    store.add_brief("20260901-000000-00", "20260901-000000", brief)
-    store.add_brief("r1-00", "r1", {**brief, "title": "Current idea"})
-    past = report._past_briefs(store, "r1")
-    assert [p["date"] for p in past] == ["2026-09-01"]
-    assert past[0]["briefs"][0]["title"] == "Old idea"
     page = report.build(cfg, store, run_id="r1")[0].read_text(encoding="utf-8")
-    assert 'id="past"' in page and "Old idea" in page
-
-
-def test_briefs_keep_their_order_when_the_latest_run_has_none(store, cfg):
-    seed(store, cfg)
-    base = {"one_liner": "o", "difficulty": 3, "novelty": 2, "effort_weeks": 4, "pitch": "",
-            "why_now": "", "hard_parts": [], "you_will_learn": [], "milestones": [],
-            "prior_art": [], "kill_criteria": "", "ai_leverage": "", "source_urls": []}
-    for i in range(3):
-        store.add_brief(f"r1-{i:02d}", "r1", {**base, "title": f"Brief {i + 1}"})
-    store.start_run("r2")                                   # a later run with no briefs
-    page = report.build(cfg, store)[0].read_text(encoding="utf-8")
-    assert page.index("Brief 1") < page.index("Brief 2") < page.index("Brief 3")
+    assert "view-briefs" not in page and "项目简报" not in page
+    assert 'data-zh="多来源印证"' in page

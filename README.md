@@ -3,10 +3,10 @@
 Finds technically interesting projects worth building, by watching what strong
 engineers are actually doing.
 
-Six free sources feed a scoring pipeline; the survivors go through two passes
-in Claude Code that turn raw signal into concrete project briefs scoped for a
-senior engineer with months rather than days. No API key is needed: the briefs
-use your existing Claude Code login.
+Free sources feed a scoring pipeline that ranks repos, papers and threads by
+momentum, corroboration, fit and engineering depth. Claude Code reads the top
+items to weed out thin wrappers and marketing, and translates the page into
+Chinese. No API key is needed: it uses your existing Claude Code login.
 
 No X/Twitter API — it has no free search tier ($200/mo minimum). The free
 sources below carry most of the same signal, because engineering threads on X
@@ -22,8 +22,9 @@ python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.lock
 ```
 
 `requirements.lock` holds the exact versions CI tests against;
-`requirements.txt` holds the ranges it was resolved from. For the briefs you
-also need [Claude Code](https://claude.com/claude-code), signed in once.
+`requirements.txt` holds the ranges it was resolved from. For the card pass and
+translation you also need [Claude Code](https://claude.com/claude-code), signed
+in once.
 
 On macOS/Linux use `.venv/bin/python` and call it as `python -m radar` — the
 `.cmd`/`.ps1` wrappers are Windows conveniences, not requirements.
@@ -42,9 +43,9 @@ Then run the pipeline:
 .\radar.cmd run
 ```
 
-`run` does the whole pipeline — fetch, rank, enrich, both Claude Code passes,
-report — and opens the dashboard. If Claude Code is missing or signed out, `run`
-says so and still builds the ranked feed; `--no-llm` skips the passes on purpose.
+`run` does the whole pipeline — fetch, rank, enrich, the Claude Code card pass,
+translation, report — and opens the dashboard. If Claude Code is missing or signed out, `run`
+says so and still builds the ranked feed; `--no-llm` skips them on purpose.
 
 Run it whenever you want a fresh look. Nothing is scheduled.
 
@@ -133,9 +134,9 @@ your normal git credentials. The site gets:
 - **`/archive/`** — every previous page, dated, newest first
 - **`/digest.md`** and **`/radar.db`** — the digest and the corpus
 
-Your machine is the single source of truth. Briefs can only be generated here
-(they need a Claude Code login), so the site is published from here too, and
-your local `radar.db` is the corpus. The GitHub Actions workflow only runs the
+Your machine is the single source of truth. The Claude Code passes need a
+login that only exists here, so the site is published from here too, and your
+local `radar.db` is the corpus. The GitHub Actions workflow only runs the
 tests.
 
 Three decisions worth knowing:
@@ -156,16 +157,12 @@ another machine, publishing would silently discard it. `--force` overrides.
 The live page is at <https://cdydoodle.github.io/project-radar/>; `radar run`
 writes the same thing to `out/index.html`, which stays gitignored.
 
-The page has four views, switched from the top bar without reloading, and the
-address keeps your place (`#overview`, `#briefs`, `#feed`, `#tracks`):
+The page has up to three views, switched from the top bar without reloading,
+and the address keeps your place (`#overview`, `#feed`, `#tracks`):
 
-- **Overview** — this run at a glance: counts, the AI-focus split of the feed as
-  a bar, the board's key takeaway (collapsed to three lines), the "worth a look"
-  lanes as cards, and links into the other views.
-- **Project briefs** — what the briefs are, then one compact card each: number,
-  title, one-liner, difficulty, novelty, weeks, and whether a dive checked it.
-  A card opens a side drawer with the whole brief — milestones as a timeline,
-  the kill criteria called out, and the dive result if there is one.
+- **Overview** — this run at a glance: counts, how many items several sources
+  agree on, the AI-focus split of the feed as a bar, and the "worth a look"
+  lanes as cards.
 - **Signal** — the ranked feed as cards, with search and sort in a sticky bar and
   the focus, theme, source and language filters folded into one panel.
 - **Your projects** — tracked projects and what each run found; only shown once
@@ -196,8 +193,7 @@ so the toggle needs no rebuild. The page opens in Chinese by default
 (`report.language = "zh-CN"`).
 
 The content is translated too: item descriptions, paper and headline titles,
-briefs, dives, the board summary and track hits. `radar run` (and each dive)
-renders the page once in a recording mode to collect exactly the strings it
+and track hits. `radar run` renders the page once in a recording mode to collect exactly the strings it
 will show, translates the new ones through Claude Code in batches, and stores
 them by a hash of the source text, so each string is translated once and later
 runs only send what is new. Repo names, URLs, code and standard technical terms
@@ -209,8 +205,7 @@ languages.
 The page is static, so save and dismiss can't write to the database; the
 buttons copy the command to run. "Worth a look" also has a **Saved** lane, and
 "Moving fastest" leaves out repos the `mega` penalty has already marked as
-famous. Briefs from earlier runs are kept in a collapsed **Earlier briefs**
-section.
+famous.
 
 Collapsed groups stay as a one-line header with their item count, and the
 counter breaks out how many rows are hidden that way. Choices persist in
@@ -308,78 +303,39 @@ This only shows up after `enrich` has run, and only on the top-ranked items —
 i.e. precisely the rows anyone actually looks at. A corpus-wide average hides
 it completely.
 
-## How the briefs work
+## Signal cards
 
-Two passes, because a per-item summariser can only ever say "reimplement this".
-Both run through `claude -p`, Claude Code's headless mode, with tools disabled
-and a JSON schema for the answer, which radar validates and retries once.
-
-**Pass A — signal cards.** Each top item gets a card: what it actually is,
-technical depth 1–5 with a reason, what's still unsolved, and a `low_substance`
-flag. That flag is the noise filter regexes can't be: it catches the
-well-marketed empty repo. Items go six to a call, each judged on its own.
+Claude Code reads the top-ranked items (`cards.count`, 18) and writes a card
+for each: what it actually is, technical depth 1–5 with a reason, what's still
+unsolved, and a `low_substance` flag. That flag is the noise filter regexes
+can't be: it catches the well-marketed empty repo. Items go six to a call, each
+judged on its own, through `claude -p` with no tools and a JSON schema for the
+answer, which radar validates and retries once.
 
 Cards feed back into the ranking. A `low_substance` card and a depth of 1 or 2
-become penalties on that item, so the feed and highlights benefit, not just the
-briefs. There is deliberately no bonus: only the top few items are ever carded,
-and a bonus would keep lifting exactly those. Cards expire after
-`brief.card_ttl_days` (60) so a repo that changed gets read again.
-
-**Pass B — synthesis.** Every surviving card goes into one call together with
-your profile. Because the model sees the whole board at once, it can cross items
-over — a technique from a paper applied to a runtime from a repo, a tool that
-only becomes possible because two separate things now exist. The prompt requires
-at least half the briefs to combine two or more sources.
-
-Each brief carries `hard_parts`, `milestones`, honest `prior_art`, and
-`kill_criteria` — a falsifiable result reachable in ~2 weeks that means abandon
-it. That last field matters more than the rest when you have one year.
-
-## Checking a brief before you commit to it
-
-The briefs are written by a model that could not search, so "novelty 4/5" and
-"nothing close exists" are unverified claims. `radar dive <n>` hands brief *n*
-to Claude Code with web search and fetch, and asks it to go and look: GitHub
-for implementations, arXiv and the web for papers and products, and the source
-repos for what they already do.
-
-It returns a verdict (`go`, `pivot`, `crowded`, `kill`), a revised novelty
-score, every piece of prior art it actually opened, the risks, what you'd need,
-sharper angles if the original is weak, and a runnable two-week experiment that
-tests the riskiest assumption first. Then radar checks the answer itself: every
-cited link is fetched (GitHub repos through the API, with their star count), and
-any that don't resolve are marked on the page instead of being trusted.
-
-The first real dive paid for itself. A brief proposing a "SCIP-grounded precision
-audit" of a code-map tool came back `pivot`, novelty 3 → 2: the tool already had
-a SCIP overlay and a merged PR measuring exactly that, and two other projects had
-published the same kind of benchmark. It suggested the version that didn't exist
-yet. All 14 links it cited resolved.
-
-A dive is about as much usage as a full `radar run`. `radar dive --list` shows
-which briefs have been checked.
+become penalties on that item, so thin projects sink in the feed and the
+highlights. There is deliberately no bonus: only the top few items are ever
+carded, and a bonus would keep lifting exactly those. Cards expire after
+`cards.ttl_days` (60) so a repo that changed gets read again.
 
 ## After you pick a project
 
 ```bash
-.
-adar.cmd track add "code-map benchmark" --from-brief 8
-.
-adar.cmd track
+.\radar.cmd track add "code-map benchmark" --keywords "call graph accuracy,SCIP oracle,code map benchmark"
+.\radar.cmd track
 ```
 
 Choosing is not the end of radar's job. On a year-long project the risk that
 matters is someone shipping it first, or a paper that changes the approach, and
-finding out three months late. A track is a named set of search phrases — by
-default the search terms a dive produced — and every `radar run` checks:
+finding out three months late. A track is a named set of search phrases, and
+every `radar run` checks:
 
 - **radar's own corpus** for items matching two phrases, or every word of one;
 - **GitHub** for repos created since you started tracking;
 - **arXiv** for papers submitted since then.
 
-Dive phrases are search queries rather than exact strings, so matching uses the
-meaningful words of each phrase, not the literal phrase. The brief's own source
-repos are never reported as competitors. New hits sit at the top of the
+Phrases are treated as search queries rather than exact strings, so matching
+uses the meaningful words of each phrase, not the literal phrase. New hits sit at the top of the
 dashboard under **Your projects**; `radar track show <name>` lists them all and
 `radar track stop <name>` ends a track. GitHub searches are paced for its
 30-a-minute limit and arXiv's for its three-second rule, four phrases per track
@@ -392,9 +348,8 @@ each, so a check takes a minute or two.
 ```
 
 opens the dashboard at `http://127.0.0.1:8766/` with working buttons: save,
-dismiss and undo write straight to the database, notes can be added to any
-item, and an unchecked brief has a button that runs `radar dive` in the
-background. The published page stays static and never contains any of this.
+dismiss and undo write straight to the database, and notes can be added to any
+item. The published page stays static and never contains any of this.
 
 It listens on 127.0.0.1 only. Writes need a random token that exists only
 inside the served page, so another site open in the same browser can't post to
@@ -421,8 +376,7 @@ never invents a gap. GitHub search allows 30 requests a minute, so unchecked
 papers take about two seconds each; results are kept for 14 days.
 
 ```bash
-.
-adar.cmd gaps
+.\radar.cmd gaps
 ```
 
 lists the gaps with their upvotes and scores, checking any that are due first.
@@ -430,10 +384,8 @@ lists the gaps with their upvotes and scores, checking any that are due first.
 ## Learning your taste
 
 ```bash
-.
-adar.cmd tune
-.
-adar.cmd tune --apply
+.\radar.cmd tune
+.\radar.cmd tune --apply
 ```
 
 Once you have saved and dismissed at least five items each, `tune` proposes
@@ -460,15 +412,13 @@ radar fetch     pull every enabled source
 radar rank      rescore everything (no network, instant)
 radar top       show the current ranking
 radar enrich    fetch READMEs for the top repos
-radar cards     Claude Code pass A: triage top items
-radar brief     Claude Code pass B: synthesize project briefs
+radar cards     Claude Code: read the top items and card them
 radar report    build the HTML dashboard + markdown digest
-radar run       all of the above
+radar run       fetch, rank, enrich, cards, translate, report
 radar show      everything known about one item, incl. score breakdown
 radar save      mark items worth keeping (--note to add a note)
 radar dismiss   never show these again
 radar undo      clear a save or dismiss
-radar dive      check a brief against the web (radar dive 3; --list)
 radar serve     the dashboard on localhost, with working buttons
 radar tune      learn ranking weights from your saves and dismissals (--apply)
 radar gaps      papers checked to have no implementation
@@ -517,28 +467,26 @@ follows them and the overlapping repos. `radar watch --add <login>` writes to
 suggestions are modest, because those engineers follow few people in common;
 the more personal the list, the better this gets.
 
-**`profile.description`** — free text passed verbatim into the ideation prompt.
-Be specific about what you already know, what you want to learn, and what you'd
-hate building. Vague profiles produce vague briefs.
+**`profile.description`** — free text describing you. Nothing reads it at the
+moment: it fed the project briefs, which were removed. It is kept for reference.
 
 ## Credentials
 
 - **GitHub** — picked up automatically from `gh auth token` if you're logged in.
   Otherwise set `GITHUB_TOKEN`. Without one you'll hit rate limits fast.
-- **Claude Code** — only `cards` and `brief` need it. Run `claude` once and
+- **Claude Code** — only the card pass and translation need it. Run `claude` once and
   sign in with /login; `radar doctor` confirms it. radar finds `claude` on PATH,
-  or the copy the Claude desktop app bundles on Windows; set `brief.claude_path`
+  or the copy the Claude desktop app bundles on Windows; set `claude.claude_path`
   otherwise. No API key is read. If `ANTHROPIC_API_KEY` is set in your shell,
   radar withholds it from Claude Code so a run can't be billed to an API account.
 
 ## Usage
 
-Pass A is one Claude Code call per six items (18 items by default, so three
-calls), pass B is a single call. Both count against your Claude plan's usage
-limits. Use less by lowering `brief.cards` or setting `brief.effort = "medium"`.
-Cards are reused until they expire, so a rerun mostly pays for pass B.
-
-Set `brief.language = "zh-CN"` to get cards and briefs in Simplified Chinese.
+The card pass is one Claude Code call per six items (18 by default, so three
+calls), and cards are reused until they expire, so a rerun sends only new top
+items. Translation sends only strings it has never seen. Both count against your
+Claude plan's usage limits; lower `cards.count` or set `cards.effort = "medium"`
+to use less.
 
 Re-running `fetch` inside 30 minutes is served from `.cache/`, so tuning weights
 costs nothing.

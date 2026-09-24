@@ -40,10 +40,8 @@ enabled = true
 [sources.github_starred]
 users = ["alice", "bob"]
 
-[brief]
-model = "claude-opus-5"
-cards = 3
-count = 2
+[cards]
+count = 3
 
 [translate]
 # Tests never call the real Claude Code CLI; translation tests enable it

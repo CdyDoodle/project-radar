@@ -78,25 +78,4 @@ def test_foreign_host_cannot_even_read(server):
 def test_bad_input(server):
     assert req(server, "/api/verdict", {"key": "gh:b/db", "status": "deleted"})[0] == 400
     assert req(server, "/api/verdict", {"key": "gh:no/such", "status": "saved"})[0] == 404
-    assert req(server, "/api/dive", {"brief": "nope"})[0] == 404
-
-
-def test_dive_runs_in_the_background(server, store, monkeypatch):
-    from radar import dive as dv
-    store.add_brief("r1-00", "r1", {"title": "b"})
-    done = threading.Event()
-
-    def fake_dive(cfg, st, brief, http=None):
-        done.set()
-        return {}
-
-    monkeypatch.setattr(dv, "dive", fake_dive)
-    code, body = req(server, "/api/dive", {"brief": "r1-00"})
-    assert code == 202 and json.loads(body)["state"] == "running"
-    assert done.wait(5)
-    for _ in range(50):
-        _, jobs = req(server, "/api/jobs")
-        if json.loads(jobs)["r1-00"]["state"] == "done":
-            break
-        threading.Event().wait(0.1)
-    assert json.loads(jobs)["r1-00"]["state"] == "done"
+    assert req(server, "/api/dive", {"brief": "nope"})[0] == 404         # endpoint is gone

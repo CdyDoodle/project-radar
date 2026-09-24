@@ -3,8 +3,7 @@
 Choosing the project is not the end of radar's job. For a year-long project
 the risk that matters is someone else shipping it first, or a paper that
 changes the approach, and finding out three months late. A track is a named
-set of search phrases (by default the `search_terms` a dive produced), and
-every run checks three places for anything new:
+set of search phrases, and every run checks three places for anything new:
 
 1. the corpus: items matching two phrases, or every meaningful word of one;
 2. GitHub: repos *created after the track started* matching a phrase;
@@ -37,13 +36,13 @@ _sleep = time.sleep
 ATOM = {"a": "http://www.w3.org/2005/Atom"}
 
 
-def add(store: Store, name: str, keywords: list[str], brief_id: str | None = None) -> int:
+def add(store: Store, name: str, keywords: list[str]) -> int:
     keywords = [k.strip().lower() for k in keywords if k.strip()]
     if not keywords:
         raise ValueError("a track needs at least one search phrase")
     cur = store.conn.execute(
-        "INSERT INTO tracks (name, keywords, brief_id, created_at) VALUES (?,?,?,?)",
-        (name, json.dumps(keywords), brief_id, now().isoformat()))
+        "INSERT INTO tracks (name, keywords, created_at) VALUES (?,?,?)",
+        (name, json.dumps(keywords), now().isoformat()))
     store.conn.commit()
     return cur.lastrowid
 
@@ -94,8 +93,8 @@ def words(phrase: str) -> list[str]:
 def phrase_hit(phrase: str, text: str, full: bool = False) -> bool:
     """Most of a phrase's words present as whole words (all of them if `full`).
 
-    Dive search terms are search-engine queries ("SCIP oracle tree-sitter call
-    graph precision recall"), not exact strings: word order and filler vary.
+    Search phrases are queries ("SCIP oracle tree-sitter call graph precision
+    recall"), not exact strings: word order and filler vary.
     """
     ws = words(phrase)
     if not ws:
@@ -107,14 +106,8 @@ def phrase_hit(phrase: str, text: str, full: bool = False) -> bool:
 def match_corpus(store: Store, track: dict) -> int:
     """Items matching two phrases, or all the words of one."""
     phrases = track["keywords"]
-    brief_sources = set()
-    if track.get("brief_id"):
-        b = store.brief(track["brief_id"])
-        brief_sources = {canonical_key(u) for u in (b or {}).get("source_urls", [])}
     added = 0
     for r in store.items():
-        if r["key"] in brief_sources:
-            continue                         # the project's own inspirations
         title = (r["title"] or "").lower()
         text = " ".join([title, (r["summary"] or "").lower(),
                          " ".join(json.loads(r["topics"] or "[]"))])
