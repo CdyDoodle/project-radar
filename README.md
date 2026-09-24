@@ -344,6 +344,29 @@ never over the `index.html` that `publish` ships.
 Every save, dismiss and undo, from here or the CLI, is logged with the item's
 score breakdown at that moment. That log is what `radar tune` learns from.
 
+## Learning your taste
+
+```bash
+.adar.cmd tune
+.adar.cmd tune --apply
+```
+
+Once you have saved and dismissed at least five items each, `tune` proposes
+new weights for the six score components: saved items should outrank dismissed
+ones, so it fits the weights that make that true more often, using a pairwise
+ranking loss pulled toward the current weights. A handful of verdicts can only
+nudge the ranker, never swing it (`--strength` sets how hard it pulls back), and
+no component can go negative.
+
+It prints how often saved items outrank dismissed ones now, after fitting, and
+on held-out verdicts, each predicted by a model fitted without it. The held-out
+figure is the honest one, and tune says so when the change wouldn't generalise.
+It also suggests interest terms to raise, lower or add, from the words and
+topics that separate what you kept from what you threw away.
+
+Nothing changes until `--apply`, which edits `config.toml` in place and keeps
+its comments, then rescores.
+
 ## Commands
 
 ```
@@ -362,6 +385,7 @@ radar dismiss   never show these again
 radar undo      clear a save or dismiss
 radar dive      check a brief against the web (radar dive 3; --list)
 radar serve     the dashboard on localhost, with working buttons
+radar tune      learn ranking weights from your saves and dismissals (--apply)
 radar prune     delete items no recent run has seen (--dry-run to count)
 radar hydrate   backfill GitHub metadata for repos stored without it
 radar publish   build the report and push it to GitHub Pages

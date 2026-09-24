@@ -306,6 +306,48 @@ def cmd_serve(args) -> int:
     return 0
 
 
+def cmd_tune(args) -> int:
+    from radar import tune as tn
+    cfg, store = _open(config.load(args.home))
+    prop = tn.propose(cfg, store, lam=args.strength)
+    console.print(f"feedback: [bold]{prop.n_saved}[/] saved, [bold]{prop.n_dismissed}[/] dismissed")
+    if not prop.enough:
+        console.print(f"[yellow]need at least {tn.MIN_EACH} of each to tune[/] -- save and "
+                      "dismiss items in `radar serve` (or with `radar save` / `radar dismiss`)")
+        return 0
+
+    def pct(v):
+        return "-" if v is None else f"{v:.0%}"
+
+    table = Table(title="component weights", show_edge=False, header_style="dim")
+    for col in ("component", "now", "proposed", ""):
+        table.add_column(col, justify="right" if col in ("now", "proposed") else "left")
+    for c in tn.COMPONENTS:
+        now_, new = prop.current[c], prop.proposed[c]
+        arrow = "[green]up[/]" if new > now_ + 0.05 else "[red]down[/]" if new < now_ - 0.05 else ""
+        table.add_row(c, f"{now_:.2f}", f"{new:.2f}", arrow)
+    console.print(table)
+    console.print(f"saved above dismissed: {pct(prop.acc_before)} now -> "
+                  f"{pct(prop.acc_after)} fitted; [bold]{pct(prop.loo_after)}[/] on held-out verdicts")
+    for t, a, b in prop.raise_terms:
+        console.print(f"  [green]raise[/] interest {t!r} (in {a} saved, {b} dismissed)")
+    for t, a, b in prop.lower_terms:
+        console.print(f"  [red]lower[/] interest {t!r} (in {a} saved, {b} dismissed)")
+    for t, c in prop.add_terms:
+        console.print(f"  [green]add[/] interest {t!r} (a topic of {c} saved items, no dismissed)")
+    if prop.loo_after is not None and prop.loo_before is not None and prop.loo_after < prop.loo_before:
+        console.print("[yellow]held-out accuracy is lower than now: the change would not "
+                      "generalise; not recommended[/]")
+    if not args.apply:
+        console.print("\n[dim]nothing changed; rerun with --apply to write this into config.toml[/]")
+        return 0
+    for change in tn.apply(cfg, prop):
+        console.print(f"  [green]wrote[/] {change}")
+    rank.rank_all(store, config.load(args.home))
+    console.print("rescored with the new weights")
+    return 0
+
+
 def cmd_prune(args) -> int:
     cfg, store = _open(config.load(args.home))
     gone = store.forgotten()
@@ -415,6 +457,10 @@ def cmd_doctor(args) -> int:
     if os.environ.get("ANTHROPIC_API_KEY"):
         console.print("           [dim]ANTHROPIC_API_KEY is set; radar withholds it from "
                       "Claude Code so briefs use your Claude login[/]")
+    fb = store.feedback()
+    n_saved = sum(1 for r in fb if r["action"] == "saved")
+    console.print(f"feedback   {n_saved} saved, {len(fb) - n_saved} dismissed "
+                  f"(`radar tune` needs 5 of each)")
     console.print(f"watchlist  {len(cfg.watchlist)} engineers")
     console.print(f"interests  {len(cfg.interests)} weighted terms")
     from radar.sources import all_source_names
@@ -512,6 +558,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--port", type=int, default=8766)
     s.add_argument("--no-open", action="store_true")
     s.set_defaults(fn=cmd_serve)
+
+    s = sub.add_parser("tune", help="learn ranking weights from your saves and dismissals")
+    s.add_argument("--apply", action="store_true", help="write the proposal into config.toml")
+    s.add_argument("--strength", type=float, default=1.0,
+                   help="pull toward the current weights (higher = more cautious)")
+    s.set_defaults(fn=cmd_tune)
 
     s = sub.add_parser("prune", help="delete items no recent run has seen")
     s.add_argument("--dry-run", action="store_true")
