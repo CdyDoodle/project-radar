@@ -418,6 +418,7 @@ radar dive      check a brief against the web (radar dive 3; --list)
 radar serve     the dashboard on localhost, with working buttons
 radar tune      learn ranking weights from your saves and dismissals (--apply)
 radar gaps      papers checked to have no implementation
+radar watch     the watchlist: --suggest people, --add them
 radar prune     delete items no recent run has seen (--dry-run to count)
 radar hydrate   backfill GitHub metadata for repos stored without it
 radar publish   build the report and push it to GitHub Pages
@@ -449,6 +450,16 @@ Everything lives in `config.toml`. Two fields matter far more than the rest:
 **`sources.github_starred.users`** — the engineers whose taste you're borrowing.
 The defaults are reasonable, but this tool gets dramatically better when the list
 is personal. Twelve people you genuinely respect beats a hundred famous ones.
+
+`radar watch --suggest` helps grow that list. It looks for people several of
+your watched engineers follow, then checks what those people starred recently
+against what your watchlist starred or builds and what radar ranks highest.
+When too few are followed by two or more, it widens to single follows but only
+keeps people with at least two overlapping stars. Each suggestion shows who
+follows them and the overlapping repos. `radar watch --add <login>` writes to
+`config.toml` directly and keeps its comments. With the default list the
+suggestions are modest, because those engineers follow few people in common;
+the more personal the list, the better this gets.
 
 **`profile.description`** — free text passed verbatim into the ideation prompt.
 Be specific about what you already know, what you want to learn, and what you'd

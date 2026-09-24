@@ -449,13 +449,39 @@ def cmd_publish(args) -> int:
 
 
 def cmd_watch(args) -> int:
-    cfg, _ = _open(config.load(args.home))
-    users = cfg.watchlist
+    from radar import watch as wt
+    cfg, store = _open(config.load(args.home))
     if args.add:
-        console.print("Add to [bold]sources.github_starred.users[/] in config.toml:")
-        for u in args.add:
-            console.print(f'  "{u}",')
+        changes = wt.add(cfg, args.add)
+        for c in changes:
+            console.print(f"[green]added[/] {c.rsplit(' ', 1)[-1]} to the watchlist")
+        if not changes:
+            console.print("already watching all of them")
+        else:
+            console.print("[dim]their stars and activity are picked up on the next fetch[/]")
         return 0
+    if args.suggest:
+        with console.status("reading who your watchlist follows..."):
+            cands = wt.suggest(cfg, store, collect.make_http(cfg), limit=args.limit)
+        if not cands:
+            console.print("no one is followed by two or more of your watched engineers")
+            return 0
+        table = Table(title="engineers your watchlist points at", show_edge=False,
+                      header_style="dim")
+        table.add_column("who", overflow="fold")
+        table.add_column("followed by", overflow="fold")
+        table.add_column("same recent stars", overflow="fold", style="dim")
+        for c in cands:
+            who = f"[bold]{c.login}[/]" + (f" {c.name}" if c.name and c.name != c.login else "")
+            if c.bio:
+                who += f"\n[dim]{c.bio[:90]}[/]"
+            shared = (f"{len(c.overlap)} of {c.recent_stars}: " + ", ".join(c.overlap[:3])
+                      if c.overlap else f"0 of {c.recent_stars}")
+            table.add_row(who, ", ".join(c.followed_by), shared)
+        console.print(table)
+        console.print(f"[dim]add with: radar watch --add {' '.join(c.login for c in cands[:3])}[/]")
+        return 0
+    users = cfg.watchlist
     console.print(f"watching {len(users)} engineers: {', '.join(users)}")
     return 0
 
@@ -615,8 +641,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--all", action="store_true", help="include forgotten items too")
     s.set_defaults(fn=cmd_hydrate)
 
-    s = sub.add_parser("watch", help="show or extend the engineer watchlist")
-    s.add_argument("--add", nargs="+")
+    s = sub.add_parser("watch", help="show, extend, or get suggestions for the watchlist")
+    s.add_argument("--add", nargs="+", help="GitHub logins to add to config.toml")
+    s.add_argument("--suggest", action="store_true",
+                   help="engineers your watchlist follows and whose stars overlap theirs")
+    s.add_argument("-n", "--limit", type=int, default=10)
     s.set_defaults(fn=cmd_watch)
 
     s = sub.add_parser("doctor", help="check config, credentials and rate limits")
