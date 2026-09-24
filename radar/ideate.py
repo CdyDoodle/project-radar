@@ -256,19 +256,28 @@ def _inline_schema(model: type[BaseModel]) -> dict:
 
 
 def run_claude(cfg: Config, exe: str, system: str, prompt: str,
-               model: type[BaseModel]) -> BaseModel:
-    """One headless call with a structured answer, validated. Retries once."""
+               model: type[BaseModel], *, tools: tuple[str, ...] = (),
+               effort: str | None = None, timeout: float | None = None) -> BaseModel:
+    """One headless call with a structured answer, validated. Retries once.
+
+    `tools` is the complete set Claude Code may use, all pre-approved (in
+    print mode anything unapproved is refused). Empty means no tools at all:
+    the card and brief passes work only from the text they are given.
+    """
     args = [
         exe, "-p", "--output-format", "json",
-        "--tools", "", "--strict-mcp-config", "--no-session-persistence",
+        "--tools", ",".join(tools), "--strict-mcp-config", "--no-session-persistence",
         "--system-prompt", system,
         "--json-schema", json.dumps(_inline_schema(model)),
     ]
+    if tools:
+        args += ["--allowedTools", *tools]
     if cfg.get("brief.model"):
         args += ["--model", str(cfg.get("brief.model"))]
-    if cfg.get("brief.effort"):
-        args += ["--effort", str(cfg.get("brief.effort"))]
-    timeout = float(cfg.get("brief.timeout_seconds", 1200))
+    effort = effort or cfg.get("brief.effort")
+    if effort:
+        args += ["--effort", str(effort)]
+    timeout = float(timeout or cfg.get("brief.timeout_seconds", 1200))
 
     last: Exception | None = None
     waits = list(TRANSIENT_WAITS)

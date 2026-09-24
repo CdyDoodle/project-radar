@@ -65,7 +65,7 @@ def test_published_db_is_a_consistent_copy(store, cfg, remote, tmp_path):
                                    capture_output=True, check=True).stdout)
     conn = sqlite3.connect(out)
     assert conn.execute("SELECT COUNT(*) FROM items").fetchone()[0] == 6
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
+    assert conn.execute("PRAGMA user_version").fetchone()[0] >= 1
 
 
 def test_refuses_to_discard_runs_it_does_not_have(store, cfg, remote):

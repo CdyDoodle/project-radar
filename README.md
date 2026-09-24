@@ -300,6 +300,50 @@ Each brief carries `hard_parts`, `milestones`, honest `prior_art`, and
 `kill_criteria` — a falsifiable result reachable in ~2 weeks that means abandon
 it. That last field matters more than the rest when you have one year.
 
+## Checking a brief before you commit to it
+
+The briefs are written by a model that could not search, so "novelty 4/5" and
+"nothing close exists" are unverified claims. `radar dive <n>` hands brief *n*
+to Claude Code with web search and fetch, and asks it to go and look: GitHub
+for implementations, arXiv and the web for papers and products, and the source
+repos for what they already do.
+
+It returns a verdict (`go`, `pivot`, `crowded`, `kill`), a revised novelty
+score, every piece of prior art it actually opened, the risks, what you'd need,
+sharper angles if the original is weak, and a runnable two-week experiment that
+tests the riskiest assumption first. Then radar checks the answer itself: every
+cited link is fetched (GitHub repos through the API, with their star count), and
+any that don't resolve are marked on the page instead of being trusted.
+
+The first real dive paid for itself. A brief proposing a "SCIP-grounded precision
+audit" of a code-map tool came back `pivot`, novelty 3 → 2: the tool already had
+a SCIP overlay and a merged PR measuring exactly that, and two other projects had
+published the same kind of benchmark. It suggested the version that didn't exist
+yet. All 14 links it cited resolved.
+
+A dive is about as much usage as a full `radar run`. `radar dive --list` shows
+which briefs have been checked.
+
+## The live local dashboard
+
+```bash
+.\radar.cmd serve
+```
+
+opens the dashboard at `http://127.0.0.1:8766/` with working buttons: save,
+dismiss and undo write straight to the database, notes can be added to any
+item, and an unchecked brief has a button that runs `radar dive` in the
+background. The published page stays static and never contains any of this.
+
+It listens on 127.0.0.1 only. Writes need a random token that exists only
+inside the served page, so another site open in the same browser can't post to
+it, and requests whose Host header isn't the server's own address are refused,
+which stops DNS rebinding. The served page is written to `out/served.html`,
+never over the `index.html` that `publish` ships.
+
+Every save, dismiss and undo, from here or the CLI, is logged with the item's
+score breakdown at that moment. That log is what `radar tune` learns from.
+
 ## Commands
 
 ```
@@ -313,8 +357,11 @@ radar brief     Claude Code pass B: synthesize project briefs
 radar report    build the HTML dashboard + markdown digest
 radar run       all of the above
 radar show      everything known about one item, incl. score breakdown
-radar save      mark items worth keeping
+radar save      mark items worth keeping (--note to add a note)
 radar dismiss   never show these again
+radar undo      clear a save or dismiss
+radar dive      check a brief against the web (radar dive 3; --list)
+radar serve     the dashboard on localhost, with working buttons
 radar prune     delete items no recent run has seen (--dry-run to count)
 radar hydrate   backfill GitHub metadata for repos stored without it
 radar publish   build the report and push it to GitHub Pages

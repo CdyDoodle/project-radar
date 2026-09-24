@@ -109,8 +109,73 @@ def _migrate_1(conn: sqlite3.Connection) -> None:
         conn.execute("INSERT OR REPLACE INTO meta VALUES ('fetch_at', ?)", (seqs[-1][0],))
 
 
+def _migrate_2(conn: sqlite3.Connection) -> None:
+    """Tables for the decision tools.
+
+    feedback   every save / dismiss / undo, with the item's score breakdown
+               at that moment, so `radar tune` can learn what you meant
+    dives      verified deep-dives of a brief (`radar dive`)
+    snapshots  one reading of an item's counters per run, for real velocity
+    tracks     projects you have picked, watched for competitors
+    track_hits what each track has found
+    items.note a free-text note per item
+    """
+    conn.execute("ALTER TABLE items ADD COLUMN note TEXT DEFAULT ''")
+    conn.executescript("""
+    CREATE TABLE IF NOT EXISTS feedback (
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        key       TEXT NOT NULL,
+        action    TEXT NOT NULL,          -- saved | dismissed | new (undo)
+        at        TEXT NOT NULL,
+        score     REAL,
+        breakdown TEXT DEFAULT '{}',
+        via       TEXT DEFAULT 'cli'
+    );
+    CREATE INDEX IF NOT EXISTS feedback_key ON feedback(key);
+
+    CREATE TABLE IF NOT EXISTS dives (
+        id         TEXT PRIMARY KEY,
+        brief_id   TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        payload    TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS dives_brief ON dives(brief_id);
+
+    CREATE TABLE IF NOT EXISTS snapshots (
+        key    TEXT NOT NULL,
+        run    INTEGER NOT NULL,
+        at     TEXT NOT NULL,
+        stars  INTEGER,
+        hn_points INTEGER,
+        hf_upvotes INTEGER,
+        PRIMARY KEY (key, run)
+    );
+
+    CREATE TABLE IF NOT EXISTS tracks (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        name       TEXT NOT NULL UNIQUE,
+        keywords   TEXT NOT NULL DEFAULT '[]',
+        query      TEXT DEFAULT '',
+        brief_id   TEXT,
+        created_at TEXT NOT NULL,
+        active     INTEGER NOT NULL DEFAULT 1
+    );
+    CREATE TABLE IF NOT EXISTS track_hits (
+        track_id   INTEGER NOT NULL,
+        key        TEXT NOT NULL,
+        url        TEXT NOT NULL,
+        title      TEXT NOT NULL,
+        reason     TEXT NOT NULL,
+        found_at   TEXT NOT NULL,
+        run        INTEGER NOT NULL,
+        seen       INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (track_id, key)
+    );
+    """)
+
+
 # Each entry upgrades the database by one version (PRAGMA user_version).
-MIGRATIONS = [_migrate_1]
+MIGRATIONS = [_migrate_1, _migrate_2]
 
 
 class Store:
@@ -261,6 +326,8 @@ class Store:
                 first_seen, ts, seq,
             ),
         )
+        if fetch_seq is not None:
+            self.snapshot(item, seq)
         return item.id
 
     def refresh(self, item: Item) -> bool:
@@ -301,12 +368,87 @@ class Store:
         )
         self.conn.commit()
 
-    def set_status(self, ident: str, status: str) -> int:
+    def set_status(self, ident: str, status: str, via: str = "cli") -> int:
+        """Set a verdict, and log it as feedback for `radar tune`.
+
+        The score breakdown is copied into the log as it is now: tuning has
+        to learn from what the ranker showed you when you decided, not from
+        whatever the item scores later.
+        """
+        row = self.get(ident)
         cur = self.conn.execute(
             "UPDATE items SET status = ? WHERE id = ? OR key = ?", (status, ident, ident)
         )
+        if row is not None and cur.rowcount:
+            self.conn.execute(
+                "INSERT INTO feedback (key, action, at, score, breakdown, via) VALUES (?,?,?,?,?,?)",
+                (row["key"], status, now().isoformat(), row["score"], row["breakdown"] or "{}", via),
+            )
         self.conn.commit()
         return cur.rowcount
+
+    def set_note(self, ident: str, note: str) -> int:
+        cur = self.conn.execute(
+            "UPDATE items SET note = ? WHERE id = ? OR key = ?", (note.strip(), ident, ident))
+        self.conn.commit()
+        return cur.rowcount
+
+    def feedback(self) -> list[sqlite3.Row]:
+        """The latest verdict per item (an undo cancels an earlier one)."""
+        return self.conn.execute(
+            """SELECT f.* FROM feedback f
+               JOIN (SELECT key, MAX(id) mid FROM feedback GROUP BY key) last
+                 ON f.id = last.mid
+               WHERE f.action IN ('saved', 'dismissed')
+               ORDER BY f.id"""
+        ).fetchall()
+
+    # -- dives ----------------------------------------------------------------
+    def add_dive(self, dive_id: str, brief_id: str, payload: dict) -> None:
+        self.conn.execute(
+            "INSERT OR REPLACE INTO dives (id, brief_id, created_at, payload) VALUES (?,?,?,?)",
+            (dive_id, brief_id, now().isoformat(), json.dumps(payload)))
+        self.conn.commit()
+
+    def dives_for(self, brief_ids: list[str]) -> dict[str, dict]:
+        """Newest dive per brief."""
+        if not brief_ids:
+            return {}
+        marks = ",".join("?" * len(brief_ids))
+        out: dict[str, dict] = {}
+        for r in self.conn.execute(
+                f"SELECT * FROM dives WHERE brief_id IN ({marks}) ORDER BY created_at",
+                brief_ids):
+            payload = json.loads(r["payload"])
+            payload["_id"], payload["_at"] = r["id"], r["created_at"]
+            out[r["brief_id"]] = payload
+        return out
+
+    def brief(self, brief_id: str) -> dict | None:
+        r = self.conn.execute("SELECT * FROM briefs WHERE id = ?", (brief_id,)).fetchone()
+        if not r:
+            return None
+        payload = json.loads(r["payload"])
+        payload["_id"], payload["_run"] = r["id"], r["run_id"]
+        return payload
+
+    # -- snapshots --------------------------------------------------------------
+    def snapshot(self, item: Item, run: int) -> None:
+        m = item.metrics
+        if not any(isinstance(m.get(k), (int, float)) for k in ("stars", "hn_points", "hf_upvotes")):
+            return
+        self.conn.execute(
+            "INSERT OR REPLACE INTO snapshots (key, run, at, stars, hn_points, hf_upvotes) "
+            "VALUES (?,?,?,?,?,?)",
+            (item.key, run, now().isoformat(), m.get("stars"), m.get("hn_points"),
+             m.get("hf_upvotes")))
+
+    def snapshot_history(self) -> dict[str, list[sqlite3.Row]]:
+        """Every item's snapshots, oldest first."""
+        out: dict[str, list] = {}
+        for r in self.conn.execute("SELECT * FROM snapshots ORDER BY key, run"):
+            out.setdefault(r["key"], []).append(r)
+        return out
 
     def to_item(self, row: sqlite3.Row) -> Item:
         sources = json.loads(row["sources"] or "[]")

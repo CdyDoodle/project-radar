@@ -289,6 +289,13 @@ timeout_seconds = 1200
 # one per week. Each page is about half a megabyte.
 archive_keep_days = 30
 
+[dive]
+# `radar dive <n>` gives Claude Code web search and fetch to check a brief:
+# existing implementations, real novelty, a runnable two-week experiment.
+# One dive is roughly as much usage as a full `radar run`.
+effort = "high"
+timeout_seconds = 2400
+
 [report]
 # Default language of the dashboard and digest: "en" or "zh-CN". The page has
 # a toggle either way; this only picks what it shows first.

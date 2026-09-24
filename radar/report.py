@@ -44,6 +44,29 @@ TEMPLATE = """<!doctype html>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif&family=JetBrains+Mono:wght@400;500;600&display=swap">
 <style>
 __CSS__
+/* ---- served mode ---- */
+.note{display:block;font-size:12.5px;color:var(--warn);margin:2px 0 6px;font-style:italic}
+.served{font-family:var(--mono);font-size:10.5px;color:var(--good);margin-top:6px}
+tr.item.gone{opacity:.35}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);
+  color:var(--bg);padding:9px 16px;border-radius:99px;font-size:12.5px;z-index:99;
+  display:flex;gap:12px;align-items:center;box-shadow:var(--shadow-lg)}
+.toast button{background:transparent;color:inherit;border-color:currentColor;padding:3px 10px}
+/* ---- dives ---- */
+.dive{margin-top:18px;border-top:1px solid var(--line);padding-top:12px}
+.dive>summary{cursor:pointer;list-style:none;display:flex;gap:8px;align-items:center;
+  flex-wrap:wrap;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.11em;
+  color:var(--muted)}
+.dive>summary::-webkit-details-marker{display:none}
+.dive:not([open])>summary .chev{transform:rotate(-90deg)}
+.dive p,.dive li{font-size:13.5px}
+.verdict{font-family:var(--mono);font-size:10.5px;padding:3px 10px;border-radius:99px;
+  text-transform:none;letter-spacing:0}
+.v-go{color:var(--good);background:var(--good-soft)}
+.v-pivot{color:var(--warn);background:var(--sunken)}
+.v-crowded,.v-kill{color:var(--accent);background:var(--accent-soft)}
+.tag.ok{color:var(--good);background:var(--good-soft)}
+.tag.bad{color:var(--accent);background:var(--accent-soft)}
 /* ---- row actions, saved rows, language, earlier briefs ---- */
 .acts{display:inline-flex;gap:4px;margin-left:6px;vertical-align:middle}
 .acts button{font-size:9.5px;padding:2px 8px;opacity:0;transition:opacity .12s,all .15s}
@@ -69,6 +92,7 @@ tr.item:hover .acts button,.acts button:focus-visible,.acts button.done{opacity:
   <div class="mast">
     <div>
       <h1>radar<span>.</span></h1>
+      {% if api %}<div class="served" data-en="live: buttons write to your local database" data-zh="本地模式：按钮直接写入本地数据库"></div>{% endif %}
       <div class="tagline" data-en="Technically interesting projects, ranked by what strong engineers are actually building &middot; {{ generated }}"
            data-zh="值得做的技术项目，按优秀工程师正在真正做的事情排名 &middot; {{ generated }}"></div>
     </div>
@@ -148,6 +172,41 @@ tr.item:hover .acts button,.acts button:focus-visible,.acts button.done{opacity:
   </div>
   <div class="kill"><b data-en="Kill criteria." data-zh="放弃标准。"></b> {{ b.kill_criteria }}</div>
   <div class="srcs">{% for u in b.source_urls %}<a href="{{ u }}">{{ u }}</a><br>{% endfor %}</div>
+  {% set d = dives.get(b._id) %}
+  {% if d %}
+  <details class="dive" open>
+    <summary><span class="chev"></span>
+      <span data-en="Checked against the web" data-zh="联网核实结果"></span>
+      <span class="verdict v-{{ d.verdict }}" data-en="{{ d.verdict }}" data-zh="{{ {'go':'可以做','pivot':'换个角度','crowded':'已有人做','kill':'放弃'}[d.verdict] }}"></span>
+      <span class="pill" data-en="novelty {{ b.novelty }}/5 &rarr; {{ d.novelty_revised }}/5" data-zh="新颖度 {{ b.novelty }}/5 &rarr; {{ d.novelty_revised }}/5"></span>
+      <span class="hl-stat" data-en="{{ d.dived_at[:10] }}" data-zh="{{ d.dived_at[:10] }}"></span>
+    </summary>
+    <p>{{ d.verdict_reason }}</p>
+    <p><strong data-en="Novelty." data-zh="新颖度。"></strong> {{ d.novelty_reason }}</p>
+    {% if d.prior_art %}
+    <div class="blk"><h4 data-en="Prior art found" data-zh="找到的已有工作"></h4><ul>
+      {% for a in d.prior_art %}<li><span class="tag {{ 'ok' if a.verified else 'bad' }}" data-en="{{ 'link ok' if a.verified else 'link failed' }}" data-zh="{{ '链接有效' if a.verified else '链接失效' }}"></span>
+        <span class="tag" data-en="{{ a.closeness }}" data-zh="{{ {'same':'相同','overlapping':'大量重叠','adjacent':'相关'}[a.closeness] }}"></span>
+        <a href="{{ a.url }}">{{ a.name }}</a>{% if a.stars %} <span class="why">{{ '{:,}'.format(a.stars) }}*</span>{% endif %} &mdash; {{ a.note }}</li>{% endfor %}
+    </ul></div>
+    {% endif %}
+    <div class="cols">
+      <div class="blk"><h4 data-en="Two-week experiment" data-zh="两周实验"></h4>
+        <p style="margin:0 0 6px">{{ d.two_week_experiment.goal }}</p><ul>
+        {% for st in d.two_week_experiment.steps %}<li>{{ st }}</li>{% endfor %}</ul>
+        <p style="margin:6px 0 0"><b data-en="Measure:" data-zh="衡量："></b> {{ d.two_week_experiment.success_metric }}<br>
+        <b data-en="Stop if:" data-zh="放弃条件："></b> {{ d.two_week_experiment.kill_threshold }}</p></div>
+      <div class="blk"><h4 data-en="Risks" data-zh="风险"></h4><ul>
+        {% for r in d.risks %}<li>{{ r }}</li>{% endfor %}</ul>
+        {% if d.needs %}<h4 data-en="Needs" data-zh="需要"></h4><ul>{% for n in d.needs %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}
+        {% if d.pivot_ideas %}<h4 data-en="Sharper angles" data-zh="更好的切入点"></h4><ul>{% for n in d.pivot_ideas %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+    </div>
+  </details>
+  {% else %}
+  <div class="srcs"><span data-en="Not checked yet: radar dive {{ loop.index }}" data-zh="尚未联网核实：radar dive {{ loop.index }}"></span>
+    {% if api %} <button class="dive-btn" data-brief="{{ b._id }}" data-en="check it now" data-zh="立即核实"></button>{% endif %}</div>
+  {% endif %}
 </article>
 {% endfor %}
 {% endif %}
@@ -218,7 +277,7 @@ tr.item:hover .acts button,.acts button:focus-visible,.acts button.done{opacity:
 <tbody id="body">
 {% for r in rows %}
 <tr class="item"
-    data-key="{{ r.key }}"
+    data-key="{{ r.key }}" data-status="{{ r.status }}"
     data-text="{{ (r.title ~ ' ' ~ r.summary ~ ' ' ~ (r.lang or '') ~ ' ' ~ r.topics|join(' ') ~ ' ' ~ r.themes|join(' '))|lower }}"
     data-sources="{{ r.sources|join(' ') }}"
     data-themes="{{ r.themes|join(' ') }}"
@@ -230,9 +289,10 @@ tr.item:hover .acts button,.acts button:focus-visible,.acts button.done{opacity:
   <td class="score">{{ '%.2f'|format(r.score) }}</td>
   <td>
     <a href="{{ r.url }}" class="item-title">{{ r.title }}</a>
-    <span class="acts"><button class="act" data-cmd="save" data-en="save" data-zh="保存"></button><button class="act" data-cmd="dismiss" data-en="dismiss" data-zh="忽略"></button></span>
+    <span class="acts"><button class="act" data-cmd="save" data-en="save" data-zh="保存"></button><button class="act" data-cmd="dismiss" data-en="dismiss" data-zh="忽略"></button>{% if api %}<button class="act" data-cmd="note" data-en="note" data-zh="备注"></button>{% endif %}</span>
     <span class="desc">{{ r.summary[:190] }}</span>
     {% if r.status == 'saved' %}<span class="tag sv" data-en="saved" data-zh="已保存"></span>{% endif %}
+    {% if r.note %}<span class="note">{{ r.note }}</span>{% endif %}
     <span class="tag ax" data-en="{{ r.axis_label.en }}" data-zh="{{ r.axis_label.zh }}"></span>
     {% if r.lang %}<span class="tag">{{ r.lang }}</span>{% endif %}
     {% for t in r.theme_labels %}<span class="tag th" data-en="{{ t.en }}" data-zh="{{ t.zh }}"></span>{% endfor %}
@@ -258,6 +318,7 @@ const body=$('#body'), q=$('#q'), showSel=$('#show'), sortSel=$('#sort'),
       countEl=$('#count'), emptyEl=$('#empty'), langBtn=$('#lang-toggle');
 const items=[...body.querySelectorAll('tr.item')];
 const TL={{ theme_labels|tojson }};
+const API={{ api|tojson }};
 const T={
   en:{count:(v,t,h,n)=>`showing ${v} of ${t} matched`+(h?` · ${h} collapsed`:'')+` · ${n} in feed`,
       items:n=>n+' item'+(n===1?'':'s'), hidden:' (hidden)', collapse:'collapse all',
@@ -376,6 +437,68 @@ function render(){
   collapseBtn.hidden = !state.group;
   collapseBtn.textContent = collapsedHere.length ? L.expand : L.collapse;
   save();
+}
+
+// Served by `radar serve`: buttons talk to the local server instead.
+async function call(path, body){
+  const r = await fetch(path, {method: body ? 'POST' : 'GET',
+    headers: {'Content-Type': 'application/json', 'X-Radar-Token': API},
+    body: body ? JSON.stringify(body) : undefined});
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+function toast(msg, undo){
+  document.querySelectorAll('.toast').forEach(t=>t.remove());
+  const t=document.createElement('div'); t.className='toast'; t.textContent=msg;
+  if(undo){ const b=document.createElement('button');
+    b.textContent = state.lang==='zh' ? '撤销' : 'undo';
+    b.onclick=()=>{ undo(); t.remove(); }; t.appendChild(b); }
+  document.body.appendChild(t); setTimeout(()=>t.remove(), 6000);
+}
+async function verdict(tr, status){
+  await call('/api/verdict', {key: tr.dataset.key, status});
+  tr.dataset.status = status;
+  tr.classList.toggle('gone', status==='dismissed');
+  let tag = tr.querySelector('.tag.sv');
+  if(status==='saved' && !tag){ tag=document.createElement('span'); tag.className='tag sv';
+    tag.dataset.en='saved'; tag.dataset.zh='已保存'; tr.querySelector('.desc').after(tag); applyLang(); }
+  if(status!=='saved' && tag) tag.remove();
+}
+if(API){
+  document.querySelectorAll('button.act').forEach(b=>b.addEventListener('click', async e=>{
+    e.preventDefault(); e.stopImmediatePropagation();
+    const tr=b.closest('tr'), zh=state.lang==='zh';
+    try{
+      if(b.dataset.cmd==='note'){
+        const cur=(tr.querySelector('.note')||{}).textContent||'';
+        const note=window.prompt(zh?'备注：':'Note:', cur); if(note===null) return;
+        await call('/api/note', {key: tr.dataset.key, note});
+        let el=tr.querySelector('.note');
+        if(!el){ el=document.createElement('span'); el.className='note'; tr.querySelector('.desc').after(el); }
+        el.textContent=note; if(!note) el.remove(); return;
+      }
+      const target = b.dataset.cmd==='save'
+        ? (tr.dataset.status==='saved' ? 'new' : 'saved') : 'dismissed';
+      const prev = tr.dataset.status;
+      await verdict(tr, target);
+      toast((zh ? {saved:'已保存', dismissed:'已忽略', new:'已取消保存'}
+                : {saved:'saved', dismissed:'dismissed', new:'unsaved'})[target] + ' · ' + tr.dataset.key,
+            ()=>verdict(tr, prev));
+    }catch(err){ toast((zh?'失败：':'failed: ') + err.message); }
+  }, true));
+  document.querySelectorAll('button.dive-btn').forEach(b=>b.addEventListener('click', async ()=>{
+    const zh=state.lang==='zh';
+    try{
+      await call('/api/dive', {brief: b.dataset.brief});
+      b.disabled=true; b.textContent = zh ? '核实中，可能要几分钟…' : 'checking, may take minutes…';
+      const poll=setInterval(async ()=>{
+        const jobs=await call('/api/jobs'); const j=jobs[b.dataset.brief];
+        if(j && j.state!=='running'){ clearInterval(poll);
+          if(j.state==='done') location.reload();
+          else { b.disabled=false; b.textContent=(zh?'失败：':'failed: ')+j.error; } }
+      }, 5000);
+    }catch(err){ toast((zh?'失败：':'failed: ') + err.message); }
+  }));
 }
 
 // save / dismiss: the page is static, so the buttons copy the radar command.
@@ -619,7 +742,7 @@ def _rows(store: Store, cfg: Config, limit: int) -> list[dict]:
             age = (now() - item.created_at).total_seconds() / 86400
         ax = axis.of_item(item)
         out.append({
-            "key": item.key, "status": row["status"],
+            "key": item.key, "status": row["status"], "note": row["note"] or "",
             "score": row["score"], "title": item.title, "url": item.url,
             "summary": item.summary or "", "lang": item.lang,
             "topics": item.topics, "sources": sorted(item.sources),
@@ -655,12 +778,18 @@ def _past_briefs(store: Store, current_run: str, max_runs: int = 5) -> list[dict
 
 
 def build(cfg: Config, store: Store, run_id: str | None = None,
-          feed_limit: int = 250) -> tuple[Path, Path]:
+          feed_limit: int = 250, api_token: str | None = None) -> tuple[Path, Path]:
+    """Write the dashboard and digest.
+
+    `api_token` is set only by `radar serve`: the page then talks to the local
+    server. The published page never carries one and stays fully static.
+    """
     lang = norm_lang(cfg.get("report.language", "en"))
     run_id = run_id or store.latest_run() or "adhoc"
     briefs = store.briefs(run_id=run_id) or store.briefs(limit=int(cfg.get("brief.count", 8)))
     shown_run = briefs[0]["_run"] if briefs else run_id
     past = _past_briefs(store, shown_run)
+    dives = store.dives_for([b["_id"] for b in briefs])
     rows = _rows(store, cfg, feed_limit)
     since = store.run_started(run_id)
     highlights = _highlights(store, cfg, since)
@@ -685,12 +814,19 @@ def build(cfg: Config, store: Store, run_id: str | None = None,
     env = Environment(autoescape=True)
     html = env.from_string(TEMPLATE.replace("__CSS__", CSS)).render(
         generated=generated, run_id=run_id, briefs=briefs, past=past, rows=rows,
+        dives=dives, api=api_token,
         source_names=source_names, theme_names=theme_names, languages=languages,
         theme_labels=themes.LABELS_ZH, lang=lang,
         axes=[{"id": a, "en": axis.label(a), "zh": axis.label(a, "zh")} for a in axis.ALL_AXES],
         stats=stats, summary=(briefs[0].get("board_summary") if briefs else ""),
         highlights=highlights, mix=mix,
     )
+    if api_token:
+        # Never overwrite index.html with a page carrying the local API token:
+        # index.html is what `radar publish` ships.
+        served = cfg.out_dir / "served.html"
+        served.write_text(html, encoding="utf-8")
+        return served, None
     html_path = cfg.out_dir / "index.html"
     html_path.write_text(html, encoding="utf-8")
 

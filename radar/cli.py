@@ -249,6 +249,60 @@ def cmd_verdict(args, status: str) -> int:
     cfg, store = _open(config.load(args.home))
     n = sum(store.set_status(i, status) for i in args.idents)
     console.print(f"[green]{n}[/] item(s) marked {status}")
+    if getattr(args, "note", None):
+        for i in args.idents:
+            store.set_note(i, args.note)
+    return 0
+
+
+def cmd_dive(args) -> int:
+    from radar import dive as dv
+    cfg, store = _open(config.load(args.home))
+    if args.list or not args.brief:
+        run_id = args.run or dv._current_run(store)
+        briefs = store.briefs(run_id=run_id) if run_id else []
+        if not briefs:
+            console.print("no briefs yet -- run `radar run` (or `radar brief`) first")
+            return 1
+        dives = store.dives_for([b["_id"] for b in briefs])
+        console.print(f"[dim]briefs from run {run_id}; `radar dive <n>` checks one[/]")
+        for i, b in enumerate(briefs, 1):
+            d = dives.get(b["_id"])
+            mark = (f"[green]{d['verdict']}[/] novelty {d['novelty_revised']}/5" if d
+                    else "[dim]not checked[/]")
+            console.print(f"  {i}. {b['title'][:70]}  [{mark}]")
+        return 0
+    brief = dv.resolve_brief(store, args.brief, args.run)
+    if not brief:
+        console.print(f"[red]no brief[/] {args.brief}")
+        return 1
+    console.print(f"checking [bold]{brief['title']}[/]")
+    console.print("[dim]Claude Code will search the web; this usually takes several minutes[/]")
+    with console.status("searching for prior art..."):
+        rep = dv.dive(cfg, store, brief)
+    colour = {"go": "green", "pivot": "yellow", "crowded": "red", "kill": "red"}[rep["verdict"]]
+    console.print(f"\n[bold {colour}]{rep['verdict'].upper()}[/]  novelty "
+                  f"{brief.get('novelty')}/5 -> {rep['novelty_revised']}/5")
+    console.print(f"  {rep['verdict_reason']}")
+    if rep["prior_art"]:
+        console.print("\n[dim]prior art[/]")
+        for a in rep["prior_art"]:
+            ok = "[green]ok[/]" if a["verified"] else "[red]link failed[/]"
+            console.print(f"  {ok} [{a['closeness']}] {a['name']}  {a['url']}")
+    x = rep["two_week_experiment"]
+    console.print(f"\n[dim]two-week experiment[/]  {x['goal']}")
+    for st in x["steps"]:
+        console.print(f"  · {st}")
+    console.print(f"  [dim]kill if:[/] {x['kill_threshold']}")
+    console.print(f"\n[green]stored[/] {rep['_id']}  ({rep['links_checked']} links checked, "
+                  f"{rep['links_unverified']} failed)")
+    return 0
+
+
+def cmd_serve(args) -> int:
+    from radar import serve as sv
+    cfg = config.load(args.home)
+    sv.serve(cfg, port=args.port, open_browser=not args.no_open)
     return 0
 
 
@@ -427,11 +481,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("save", help="mark items as saved")
     s.add_argument("idents", nargs="+")
+    s.add_argument("--note", help="a note to keep with the item")
     s.set_defaults(fn=lambda a: cmd_verdict(a, "saved"))
 
     s = sub.add_parser("dismiss", help="never show these again")
     s.add_argument("idents", nargs="+")
     s.set_defaults(fn=lambda a: cmd_verdict(a, "dismissed"))
+
+    s = sub.add_parser("undo", help="clear a save or dismiss")
+    s.add_argument("idents", nargs="+")
+    s.set_defaults(fn=lambda a: cmd_verdict(a, "new"))
 
     s = sub.add_parser("publish", help="build the report and push it to GitHub Pages")
     s.add_argument("--dry-run", action="store_true", help="prepare and check, push nothing")
@@ -442,6 +501,17 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("-n", "--limit", type=int, default=250,
                    help="rows rendered into the page")
     s.set_defaults(fn=cmd_publish)
+
+    s = sub.add_parser("dive", help="check a brief against the web with Claude Code")
+    s.add_argument("brief", nargs="?", help="brief number on the page (1, 2, ...) or brief id")
+    s.add_argument("--run", help="pick the brief from this run instead of the latest")
+    s.add_argument("--list", action="store_true", help="list briefs and their dive status")
+    s.set_defaults(fn=cmd_dive)
+
+    s = sub.add_parser("serve", help="the dashboard on localhost, with working buttons")
+    s.add_argument("--port", type=int, default=8766)
+    s.add_argument("--no-open", action="store_true")
+    s.set_defaults(fn=cmd_serve)
 
     s = sub.add_parser("prune", help="delete items no recent run has seen")
     s.add_argument("--dry-run", action="store_true")

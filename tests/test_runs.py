@@ -134,13 +134,13 @@ def test_migration_backfills_runs_from_history(tmp_path):
     conn.commit(); conn.close()
 
     store = Store(path)
-    assert store.schema_version == 1
+    assert store.schema_version == len(__import__("radar.store").store.MIGRATIONS)
     assert store.current_fetch() == 3              # 4 runs, two within 6 hours
     every, early = store.get("everywhere"), store.get("early")
     assert (every["last_fetch"], every["runs_seen"]) == (3, 3)
     assert (early["last_fetch"], early["runs_seen"]) == (1, 1)
     Store(path)                                    # reopening is a no-op
-    assert Store(path).schema_version == 1
+    assert Store(path).schema_version == len(__import__("radar.store").store.MIGRATIONS)
 
 
 def test_starting_an_existing_run_keeps_its_start_and_stats(store):
