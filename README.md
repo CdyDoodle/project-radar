@@ -156,6 +156,24 @@ another machine, publishing would silently discard it. `--force` overrides.
 The live page is at <https://cdydoodle.github.io/project-radar/>; `radar run`
 writes the same thing to `out/index.html`, which stays gitignored.
 
+The page has four views, switched from the top bar without reloading, and the
+address keeps your place (`#overview`, `#briefs`, `#feed`, `#tracks`):
+
+- **Overview** — this run at a glance: counts, the AI-focus split of the feed as
+  a bar, the board's key takeaway (collapsed to three lines), the "worth a look"
+  lanes as cards, and links into the other views.
+- **Project briefs** — what the briefs are, then one compact card each: number,
+  title, one-liner, difficulty, novelty, weeks, and whether a dive checked it.
+  A card opens a side drawer with the whole brief — milestones as a timeline,
+  the kill criteria called out, and the dive result if there is one.
+- **Signal** — the ranked feed as cards, with search and sort in a sticky bar and
+  the focus, theme, source and language filters folded into one panel.
+- **Your projects** — tracked projects and what each run found; only shown once
+  you track something.
+
+The template lives in `radar/templates/` (`dashboard.html`, `dashboard.css`) and
+is inlined into one file at build time.
+
 `out/index.html` is a single static file — everything below is client-side, so
 it works opened from disk with no server:
 

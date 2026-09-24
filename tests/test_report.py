@@ -77,3 +77,15 @@ def test_earlier_briefs_are_listed(store, cfg):
     assert past[0]["briefs"][0]["title"] == "Old idea"
     page = report.build(cfg, store, run_id="r1")[0].read_text(encoding="utf-8")
     assert 'id="past"' in page and "Old idea" in page
+
+
+def test_briefs_keep_their_order_when_the_latest_run_has_none(store, cfg):
+    seed(store, cfg)
+    base = {"one_liner": "o", "difficulty": 3, "novelty": 2, "effort_weeks": 4, "pitch": "",
+            "why_now": "", "hard_parts": [], "you_will_learn": [], "milestones": [],
+            "prior_art": [], "kill_criteria": "", "ai_leverage": "", "source_urls": []}
+    for i in range(3):
+        store.add_brief(f"r1-{i:02d}", "r1", {**base, "title": f"Brief {i + 1}"})
+    store.start_run("r2")                                   # a later run with no briefs
+    page = report.build(cfg, store)[0].read_text(encoding="utf-8")
+    assert page.index("Brief 1") < page.index("Brief 2") < page.index("Brief 3")

@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="{{ 'zh-CN' if lang == 'zh' else 'en' }}"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>radar - {{ generated }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+__CSS__
+</style></head><body>
+{% set feed_n = rows|length %}
+{% set top_score = [(rows|map(attribute="score")|max) if rows else 1, 0.01]|max %}
+{% set dived = dives|length %}
+{% set new_hits = tracks|map(attribute='new')|map('length')|sum if tracks else 0 %}
+
+<nav class="topbar"><div class="shell">
+  <a class="brand" href="#overview" data-go="overview">radar<span>.</span></a>
+  <div class="tabs" role="tablist">
+    <button class="tab" data-go="overview" role="tab"><span data-en="Overview" data-zh="概览"></span></button>
+    {% if briefs %}<button class="tab" data-go="briefs" role="tab"><span data-en="Project briefs" data-zh="项目简报"></span><span class="n">{{ briefs|length }}</span></button>{% endif %}
+    <button class="tab" data-go="feed" role="tab"><span data-en="Signal" data-zh="信号"></span><span class="n">{{ feed_n }}</span></button>
+    {% if tracks %}<button class="tab" data-go="tracks" role="tab"><span data-en="Your projects" data-zh="你的项目"></span><span class="n {{ 'hot' if new_hits else '' }}">{{ new_hits if new_hits else tracks|length }}</span></button>{% endif %}
+  </div>
+  <div class="tools">
+    {% if api %}<span class="served live" data-en="live · writes to your database" data-zh="本地模式 · 直接写入数据库"></span>{% endif %}
+    <button class="tool" id="lang-toggle" title="English / 简体中文"></button>
+    <button class="tool" id="theme-toggle" title="light / dark" data-en="theme" data-zh="配色"></button>
+  </div>
+</div></nav>
+
+<main class="shell">
+
+<!-- ============================ overview ============================ -->
+<section class="view" id="view-overview">
+  <div class="hero">
+    <div class="eyebrow">{{ generated }}{% if run_no %} · <span data-en="run #{{ run_no }}" data-zh="第 {{ run_no }} 次运行"></span>{% endif %}</div>
+    <h1><span data-en="What strong engineers" data-zh="优秀的工程师"></span><br><em data-en="are building now." data-zh="正在做什么。"></em></h1>
+    <p class="lede" data-en="radar watches the repos, papers and threads that strong engineers are starring and building, ranks them, and turns the best into project proposals worth months of your time."
+       data-zh="radar 追踪优秀工程师正在 star、正在构建的仓库、论文和讨论，为它们排名，并把最好的组合成值得你投入数月的项目提案。"></p>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><b>{{ stats.total }}</b><i data-en="tracked" data-zh="跟踪中"></i></div>
+    <div class="stat accent"><b>{{ mix.new }}</b><i data-en="new this run" data-zh="本次新增"></i></div>
+    <a class="stat" href="#feed" data-go="feed"><b>{{ feed_n }}</b><i data-en="in the feed" data-zh="进入列表"></i></a>
+    <a class="stat" href="#briefs" data-go="briefs"><b>{{ briefs|length }}</b><i data-en="project briefs" data-zh="份项目简报"></i></a>
+    <div class="stat mix">
+      <i data-en="What the feed is about" data-zh="列表中的 AI 方向构成"></i>
+      {% set tot = (mix.infra + mix.applied + mix.nonai) or 1 %}
+      <div class="mixbar">
+        <span class="infra" style="width:{{ (100 * mix.infra / tot)|round(1) }}%"></span>
+        <span class="applied" style="width:{{ (100 * mix.applied / tot)|round(1) }}%"></span>
+        <span class="nonai" style="width:{{ (100 * mix.nonai / tot)|round(1) }}%"></span>
+      </div>
+      <div class="legend">
+        <span class="infra"><em data-en="AI infra" data-zh="AI 基础设施"></em> <b>{{ mix.infra }}</b></span>
+        <span class="applied"><em data-en="AI applied" data-zh="AI 应用"></em> <b>{{ mix.applied }}</b></span>
+        <span class="nonai"><em data-en="no AI" data-zh="非 AI"></em> <b>{{ mix.nonai }}</b></span>
+      </div>
+    </div>
+  </div>
+
+  {% if summary %}
+  <div class="takeaway" id="takeaway">
+    <div class="eyebrow" data-en="Where the board is pointing" data-zh="本期要点"></div>
+    <p class="text">{{ T(summary) }}</p>
+    <button class="more" id="takeaway-more" data-en="Read all" data-zh="展开全文"></button>
+  </div>
+  {% endif %}
+
+  {% if highlights %}
+  <div class="sub" id="hl"><h3 data-en="Worth a look" data-zh="值得一看"></h3></div>
+  <div class="lanes">
+  {% for lane in highlights %}
+    <section class="lane card" data-lane="{{ lane.key }}">
+      <div class="lane-h"><span class="dot"></span><h3 data-en="{{ lane.title.en }}" data-zh="{{ lane.title.zh }}"></h3></div>
+      <p class="note" data-en="{{ lane.note.en }}" data-zh="{{ lane.note.zh }}"></p>
+      {% for it in lane['items'] %}
+      <div class="pick">
+        <div class="pick-h">
+          <a href="{{ it.url }}">{{ TT(it.title, it.key) }}</a>
+          <span class="score-chip">{{ '%.2f'|format(it.score) }}</span>
+        </div>
+        {% if it.summary %}<div class="pick-sum clamp2">{{ T(it.summary[:150]) }}</div>{% endif %}
+        <div class="why">
+          <span class="tag ax" data-en="{{ it.axis.en }}" data-zh="{{ it.axis.zh }}"></span><span class="tag th" data-en="{{ it.theme.en }}" data-zh="{{ it.theme.zh }}"></span>
+          <span data-en="{{ it.reason.en }}" data-zh="{{ it.reason.zh }}"></span>
+        </div>
+      </div>
+      {% endfor %}
+    </section>
+  {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="jump">
+    {% if briefs %}<a class="card" href="#briefs" data-go="briefs"><div><b data-en="{{ briefs|length }} project briefs" data-zh="{{ briefs|length }} 份项目简报"></b>
+      <span data-en="proposals built from this run's signal{% if dived %} · {{ dived }} checked against the web{% endif %}" data-zh="根据本期信号综合出的项目提案{% if dived %} · {{ dived }} 份已联网核实{% endif %}"></span></div><span class="arrow">&rarr;</span></a>{% endif %}
+    <a class="card" href="#feed" data-go="feed"><div><b data-en="{{ feed_n }} ranked signals" data-zh="{{ feed_n }} 条排名信号"></b>
+      <span data-en="every item, filterable by theme, source and language" data-zh="全部条目，可按主题、来源和语言筛选"></span></div><span class="arrow">&rarr;</span></a>
+  </div>
+</section>
+
+<!-- ============================ briefs ============================ -->
+{% if briefs %}
+<section class="view" id="view-briefs" hidden>
+  <div class="section-head"><div>
+    <div class="eyebrow" data-en="From this run" data-zh="本期产出"></div>
+    <h2 data-en="Project briefs" data-zh="项目简报"></h2>
+    <p data-en="Claude read the top-ranked items and crossed them into proposals worth months of work: a technical thesis, the hard parts, milestones, and a result within two weeks that would mean stopping. Briefs marked checked were verified against the web with radar dive. Open one to read it."
+       data-zh="Claude 阅读了排名靠前的条目，把它们交叉组合成值得投入数月的项目提案：技术论点、难点、里程碑，以及两周内就能验证的放弃标准。标注“已核实”的简报经过 radar dive 联网核实。点击卡片查看详情。"></p>
+  </div></div>
+
+  <div class="brief-grid">
+  {% for b in briefs %}
+    {% set d = dives.get(b._id) %}
+    <article class="bcard card" tabindex="0" role="button" data-open="brief-{{ loop.index }}">
+      <div class="top"><span class="num">{{ '%02d'|format(loop.index) }}</span>
+        {% if d %}<span class="verdict v-{{ d.verdict }}" data-en="checked · {{ d.verdict }}" data-zh="已核实 · {{ {'go':'可以做','pivot':'换个角度','crowded':'已有人做','kill':'放弃'}[d.verdict] }}"></span>
+        {% else %}<span class="verdict v-none" data-en="not checked" data-zh="未核实"></span>{% endif %}
+      </div>
+      <h3>{{ T(b.title) }}</h3>
+      <p class="one clamp3">{{ T(b.one_liner) }}</p>
+      <div class="pills">
+        <span class="pill hot" data-en="difficulty {{ b.difficulty }}/5" data-zh="难度 {{ b.difficulty }}/5"></span>
+        <span class="pill" data-en="novelty {{ d.novelty_revised if d else b.novelty }}/5" data-zh="新颖度 {{ d.novelty_revised if d else b.novelty }}/5"></span>
+        <span class="pill" data-en="~{{ b.effort_weeks }} weeks" data-zh="约 {{ b.effort_weeks }} 周"></span>
+      </div>
+      <span class="open" data-en="Read the brief &rarr;" data-zh="查看详情 &rarr;"></span>
+    </article>
+  {% endfor %}
+  </div>
+
+  {% for b in briefs %}
+  {% set d = dives.get(b._id) %}
+  <dialog class="drawer" id="brief-{{ loop.index }}" aria-label="brief {{ loop.index }}">
+   <div class="drawer-in">
+    <div class="drawer-bar">
+      <span class="eyebrow" data-en="Brief {{ loop.index }} of {{ briefs|length }}" data-zh="第 {{ loop.index }} / {{ briefs|length }} 份简报"></span>
+      {% if d %}<span class="verdict v-{{ d.verdict }}" style="margin-left:6px" data-en="checked · {{ d.verdict }}" data-zh="已核实 · {{ {'go':'可以做','pivot':'换个角度','crowded':'已有人做','kill':'放弃'}[d.verdict] }}"></span>{% endif %}
+      <button class="close" data-close aria-label="close">&times;</button>
+    </div>
+    <h2>{{ T(b.title) }}</h2>
+    <p class="one">{{ T(b.one_liner) }}</p>
+    <div class="pills">
+      <span class="pill hot" data-en="difficulty {{ b.difficulty }}/5" data-zh="难度 {{ b.difficulty }}/5"></span>
+      <span class="pill" data-en="novelty {{ b.novelty }}/5" data-zh="新颖度 {{ b.novelty }}/5"></span>
+      <span class="pill" data-en="~{{ b.effort_weeks }} weeks" data-zh="约 {{ b.effort_weeks }} 周"></span>
+      {% if b.ai_leverage %}<span class="pill ok">AI: {{ T(b.ai_leverage[:60]) }}</span>{% endif %}
+    </div>
+    <p>{{ T(b.pitch) }}</p>
+    <p><strong data-en="Why now." data-zh="为什么是现在。"></strong> {{ T(b.why_now) }}</p>
+    <div class="cols">
+      <div><h4 data-en="Hard parts" data-zh="难点"></h4><ul>
+        {% for h in b.hard_parts %}<li>{{ T(h) }}</li>{% endfor %}</ul></div>
+      <div><h4 data-en="You will learn" data-zh="你会学到"></h4><ul>
+        {% for h in b.you_will_learn %}<li>{{ T(h) }}</li>{% endfor %}</ul></div>
+    </div>
+    <div class="cols">
+      <div><h4 data-en="Milestones" data-zh="里程碑"></h4><ol class="timeline">
+        {% for m in b.milestones %}<li>{{ T(m) }}</li>{% endfor %}</ol></div>
+      <div><h4 data-en="Prior art" data-zh="已有工作"></h4><ul>
+        {% for p in b.prior_art %}<li>{{ T(p) }}</li>{% endfor %}</ul></div>
+    </div>
+    <div class="kill"><b data-en="Kill criteria." data-zh="放弃标准。"></b> {{ T(b.kill_criteria) }}</div>
+    <div class="srcs">{% for u in b.source_urls %}<a href="{{ u }}">{{ u }}</a><br>{% endfor %}</div>
+
+    {% if d %}
+    <section class="dive">
+      <div class="dive-head">
+        <strong data-en="Checked against the web" data-zh="联网核实结果"></strong>
+        <span class="verdict v-{{ d.verdict }}" style="margin-left:0" data-en="{{ d.verdict }}" data-zh="{{ {'go':'可以做','pivot':'换个角度','crowded':'已有人做','kill':'放弃'}[d.verdict] }}"></span>
+        <span class="pill" data-en="novelty {{ b.novelty }}/5 &rarr; {{ d.novelty_revised }}/5" data-zh="新颖度 {{ b.novelty }}/5 &rarr; {{ d.novelty_revised }}/5"></span>
+        <span class="eyebrow" style="margin-left:auto">{{ d.dived_at[:10] }}</span>
+      </div>
+      <div class="dive-body">
+        <p>{{ T(d.verdict_reason) }}</p>
+        <p><strong data-en="Novelty." data-zh="新颖度。"></strong> {{ T(d.novelty_reason) }}</p>
+        {% if d.prior_art %}
+        <h4 data-en="Prior art found" data-zh="找到的已有工作"></h4><ul>
+          {% for a in d.prior_art %}<li><span class="tag {{ 'ok' if a.verified else 'bad' }}" data-en="{{ 'link ok' if a.verified else 'link failed' }}" data-zh="{{ '链接有效' if a.verified else '链接失效' }}"></span>
+            <span class="tag" data-en="{{ a.closeness }}" data-zh="{{ {'same':'相同','overlapping':'大量重叠','adjacent':'相关'}[a.closeness] }}"></span>
+            <a href="{{ a.url }}"><b>{{ a.name }}</b></a>{% if a.stars %} <span class="why">{{ '{:,}'.format(a.stars) }}*</span>{% endif %} &mdash; {{ T(a.note) }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+        <div class="cols">
+          <div><h4 data-en="Two-week experiment" data-zh="两周实验"></h4>
+            <p style="margin:0 0 6px">{{ T(d.two_week_experiment.goal) }}</p><ol class="timeline">
+            {% for st in d.two_week_experiment.steps %}<li>{{ T(st) }}</li>{% endfor %}</ol>
+            <p style="margin:4px 0 0"><b data-en="Measure:" data-zh="衡量："></b> {{ T(d.two_week_experiment.success_metric) }}<br>
+            <b data-en="Stop if:" data-zh="放弃条件："></b> {{ T(d.two_week_experiment.kill_threshold) }}</p></div>
+          <div><h4 data-en="Risks" data-zh="风险"></h4><ul>
+            {% for r in d.risks %}<li>{{ T(r) }}</li>{% endfor %}</ul>
+            {% if d.needs %}<h4 data-en="Needs" data-zh="需要"></h4><ul>{% for n in d.needs %}<li>{{ T(n) }}</li>{% endfor %}</ul>{% endif %}
+            {% if d.pivot_ideas %}<h4 data-en="Sharper angles" data-zh="更好的切入点"></h4><ul>{% for n in d.pivot_ideas %}<li>{{ T(n) }}</li>{% endfor %}</ul>{% endif %}
+          </div>
+        </div>
+      </div>
+    </section>
+    {% else %}
+    <div class="dive-cta"><span data-en="Not checked against the web yet: radar dive {{ loop.index }}" data-zh="尚未联网核实：radar dive {{ loop.index }}"></span>
+      {% if api %}<button class="btn dive-btn" data-brief="{{ b._id }}" data-en="Check it now" data-zh="立即核实"></button>{% endif %}</div>
+    {% endif %}
+   </div>
+  </dialog>
+  {% endfor %}
+
+  {% if past %}
+  <details class="panel card" id="past">
+    <summary><span class="chev"></span> <span data-en="Earlier briefs" data-zh="以前的简报"></span>
+      <span class="meta" data-en="{{ past|length }} runs" data-zh="{{ past|length }} 次运行"></span></summary>
+    <div class="panel-body">
+    {% for run in past %}
+      <div class="past-run">
+        <h4>{{ run.date }} · <span data-en="{{ run.briefs|length }} briefs" data-zh="{{ run.briefs|length }} 份"></span></h4>
+        {% for b in run.briefs %}
+        <div class="past"><b>{{ T(b.title) }}</b>
+          <span class="one">{{ T(b.one_liner) }}</span>
+          <span class="pill hot" data-en="difficulty {{ b.difficulty }}/5" data-zh="难度 {{ b.difficulty }}/5"></span> <span class="pill" data-en="~{{ b.effort_weeks }} weeks" data-zh="约 {{ b.effort_weeks }} 周"></span>
+        </div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+    </div>
+  </details>
+  {% endif %}
+</section>
+{% endif %}
+
+<!-- ============================ feed ============================ -->
+<section class="view" id="view-feed" hidden>
+  <div class="section-head"><div>
+    <div class="eyebrow" data-en="Everything, ranked" data-zh="全部条目 · 已排名"></div>
+    <h2 data-en="Ranked signal" data-zh="排名信号"></h2>
+    <p data-en="Curated order is redundancy-filtered, so near-identical projects don't stack; sort by score for the raw ranking. Hover a row to save or dismiss it."
+       data-zh="“精选”顺序做过去重，几乎相同的项目不会堆在一起；按分数排序可查看原始排名。鼠标悬停在条目上可以保存或忽略。"></p>
+  </div></div>
+
+  <div class="toolbar">
+    <div class="tb-row">
+      <div class="search"><input type="search" id="q" data-en-placeholder="Search names, descriptions, topics…   /" data-zh-placeholder="搜索名称、描述、主题…   /"></div>
+      <select id="sort" aria-label="sort">
+        <option value="curated" data-en="Curated" data-zh="精选"></option>
+        <option value="score" data-en="Score" data-zh="分数"></option>
+        <option value="velocity" data-en="Velocity" data-zh="热度"></option>
+        <option value="newest" data-en="Newest" data-zh="最新"></option>
+        <option value="stars" data-en="Stars" data-zh="星数"></option>
+      </select>
+      <select id="show" aria-label="show">
+        <option value="25">25</option>
+        <option value="50" selected>50</option>
+        <option value="100">100</option>
+        <option value="250">250</option>
+        <option value="0" data-en="all" data-zh="全部"></option>
+      </select>
+      <button class="chipbtn" id="filter-btn"><span data-en="Filters" data-zh="筛选"></span><span class="badge" id="filter-n" hidden></span></button>
+      <button class="chipbtn" id="group" data-en="Group" data-zh="分组"></button>
+      <button class="chipbtn" id="collapse"></button>
+    </div>
+    <div class="filters card" id="filters">
+      <div class="chipset"><span class="lbl" data-en="focus" data-zh="方向"></span>
+        {% for a in axes %}<button data-axis="{{ a.id }}" data-en="{{ a.en }}" data-zh="{{ a.zh }}"></button>{% endfor %}</div>
+      <div class="chipset"><span class="lbl" data-en="theme" data-zh="主题"></span>
+        {% for t in theme_names %}<button data-theme="{{ t.id }}" data-en="{{ t.en }}" data-zh="{{ t.zh }}"></button>{% endfor %}</div>
+      <div class="chipset"><span class="lbl" data-en="source" data-zh="来源"></span>
+        {% for s in source_names %}<button data-src="{{ s }}">{{ s }}</button>{% endfor %}</div>
+      <div class="chipset"><span class="lbl" data-en="language" data-zh="编程语言"></span>
+        <select id="lang"><option value="" data-en="any" data-zh="不限"></option>
+          {% for l in languages %}<option value="{{ l }}">{{ l }}</option>{% endfor %}</select>
+        <button id="reset" style="margin-left:auto" data-en="reset all" data-zh="全部重置"></button></div>
+    </div>
+    <div class="tb-row" style="margin-top:8px"><span class="count" id="count"></span></div>
+  </div>
+
+  <div class="wide"><table id="feed">
+  <thead><tr><th data-en="score" data-zh="分数"></th><th data-en="item" data-zh="条目"></th><th data-en="signal" data-zh="信号"></th></tr></thead>
+  <tbody id="body">
+  {% for r in rows %}
+  <tr class="item"
+      data-key="{{ r.key }}" data-status="{{ r.status }}"
+      data-text="{{ (r.title ~ ' ' ~ r.summary ~ ' ' ~ (r.lang or '') ~ ' ' ~ r.topics|join(' ') ~ ' ' ~ r.themes|join(' ') ~ ' ' ~ (tr(r.summary[:190]) or '') ~ ' ' ~ (tr(r.title) or ''))|lower }}"
+      data-sources="{{ r.sources|join(' ') }}"
+      data-themes="{{ r.themes|join(' ') }}"
+      data-primary="{{ r.primary }}" data-axis="{{ r.axis }}"
+      data-lang="{{ r.lang or '' }}"
+      data-score="{{ r.score }}" data-vel="{{ r.velocity }}"
+      data-age="{{ r.age_days }}" data-stars="{{ r.stars }}"
+      data-curated="{{ loop.index0 }}">
+    <td><div class="score">{{ '%.2f'|format(r.score) }}</div>
+      <div class="sbar"><i style="width:{{ [0, (100 * r.score / top_score)|round(0)]|max }}%"></i></div></td>
+    <td>
+      <a href="{{ r.url }}" class="item-title">{{ TT(r.title, r.key) }}</a>
+      <span class="acts"><button class="act" data-cmd="save" data-en="save" data-zh="保存"></button><button class="act" data-cmd="dismiss" data-en="dismiss" data-zh="忽略"></button>{% if api %}<button class="act" data-cmd="note" data-en="note" data-zh="备注"></button>{% endif %}</span>
+      <span class="desc">{{ T(r.summary[:190]) }}</span>
+      {% if r.status == 'saved' %}<span class="tag sv" data-en="saved" data-zh="已保存"></span>{% endif %}
+      {% if r.note %}<span class="note">{{ r.note }}</span>{% endif %}
+      <span class="tag ax" data-en="{{ r.axis_label.en }}" data-zh="{{ r.axis_label.zh }}"></span>
+      {% if r.lang %}<span class="tag">{{ r.lang }}</span>{% endif %}
+      {% for t in r.theme_labels %}<span class="tag th" data-en="{{ t.en }}" data-zh="{{ t.zh }}"></span>{% endfor %}
+      {% for s in r.sources %}<span class="tag">{{ s }}</span>{% endfor %}
+    </td>
+    <td class="why"><span data-en="{{ r.why.en }}" data-zh="{{ r.why.zh }}"></span><br><span data-en="{{ r.metrics_line.en }}" data-zh="{{ r.metrics_line.zh }}"></span></td>
+  </tr>
+  {% endfor %}
+  </tbody></table>
+  <div class="empty" id="empty" hidden data-en="Nothing matches those filters." data-zh="没有符合筛选条件的条目。"></div></div>
+</section>
+
+<!-- ============================ tracks ============================ -->
+{% if tracks %}
+<section class="view" id="view-tracks" hidden>
+  <div class="section-head"><div>
+    <div class="eyebrow" data-en="After you pick" data-zh="选定之后"></div>
+    <h2 data-en="Your projects" data-zh="你的项目"></h2>
+    <p data-en="Each run checks radar, GitHub and arXiv for anything new in the space of the projects you are tracking."
+       data-zh="每次运行都会在 radar、GitHub 和 arXiv 上检查你所跟踪项目领域里的新动向。"></p>
+  </div></div>
+  <div id="tracks">
+  {% for t in tracks %}
+    <div class="track card">
+      <h3>{{ t.name }}</h3>
+      <div class="meta" data-en="{{ t.new|length }} new this run · {{ t.hits|length }} total · since {{ t.created_at[:10] }}" data-zh="本次新增 {{ t.new|length }} · 共 {{ t.hits|length }} · 自 {{ t.created_at[:10] }}"></div>
+      {% for h in (t.new or t.hits)[:8] %}
+      <div class="hit"><a href="{{ h.url }}"><b>{{ TT(h.title[:110], h.key) }}</b></a>
+        {% if h.run == run_no %}<span class="tag th" data-en="new" data-zh="新"></span>{% endif %}
+        <span class="one">{{ T(h.reason) }}</span></div>
+      {% else %}
+      <div class="hit"><span class="one" data-en="Nothing found yet in radar, on GitHub or on arXiv." data-zh="radar、GitHub 和 arXiv 上都还没有发现相关内容。"></span></div>
+      {% endfor %}
+    </div>
+  {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<footer>
+  <span data-en="generated by radar &middot; sources: {{ stats.sources|join(', ') }}" data-zh="由 radar 生成 &middot; 来源：{{ stats.sources|join(', ') }}"></span><br>
+  <span data-en="Press / to search. Tune the weights in config.toml, then run radar rank." data-zh="按 / 键搜索。在 config.toml 里调整权重，然后运行 radar rank。"></span>
+</footer>
+</main>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const body=$('#body'), q=$('#q'), showSel=$('#show'), sortSel=$('#sort'),
+      langSel=$('#lang'), groupBtn=$('#group'), collapseBtn=$('#collapse'),
+      countEl=$('#count'), emptyEl=$('#empty'), langBtn=$('#lang-toggle');
+const items=[...body.querySelectorAll('tr.item')];
+const TL={{ theme_labels|tojson }};
+const API={{ api|tojson }};
+const T={
+  en:{count:(v,t,h,n)=>`${v} shown · ${t} matched`+(h?` · ${h} collapsed`:'')+` · ${n} in feed`,
+      items:n=>n+' item'+(n===1?'':'s'), hidden:' (collapsed)', collapse:'Collapse all',
+      expand:'Expand all', copied:'copied', toggle:'中文', more:'Read all', less:'Show less'},
+  zh:{count:(v,t,h,n)=>`显示 ${v} 条 · 匹配 ${t} 条`+(h?` · 折叠 ${h} 条`:'')+` · 列表共 ${n} 条`,
+      items:n=>n+' 条', hidden:'（已折叠）', collapse:'全部折叠', expand:'全部展开',
+      copied:'已复制', toggle:'EN', more:'展开全文', less:'收起'},
+};
+const state={src:'', themes:new Set(), axes:new Set(), group:true, collapsed:new Set(),
+             lang:{{ lang|tojson }}};
+
+try{ const s=JSON.parse(localStorage.getItem('radar-prefs')||'{}');
+  if(s.show) showSel.value=s.show; if(s.sort) sortSel.value=s.sort;
+  if(s.lang) langSel.value=s.lang;
+  if(s.ui==='en'||s.ui==='zh') state.lang=s.ui;
+  if(s.group!==undefined) state.group=!!s.group;
+  if(Array.isArray(s.collapsed)) state.collapsed=new Set(s.collapsed);
+}catch(e){}
+function save(){ try{ localStorage.setItem('radar-prefs', JSON.stringify({
+  show:showSel.value, sort:sortSel.value, lang:langSel.value, group:state.group,
+  ui:state.lang, collapsed:[...state.collapsed]}));
+}catch(e){} }
+
+// ---- language ----
+function themeLabel(name){ return state.lang==='zh' ? (TL[name]||name) : name; }
+function applyLang(){
+  const L=state.lang;
+  document.documentElement.lang = L==='zh' ? 'zh-CN' : 'en';
+  $$('[data-zh]').forEach(el=>{
+    const v = L==='zh' ? el.dataset.zh : el.dataset.en;
+    if(v!==undefined) el.textContent=v;
+  });
+  $$('[data-zh-placeholder]').forEach(el=>{
+    el.placeholder = L==='zh' ? el.dataset.zhPlaceholder : el.dataset.enPlaceholder;
+  });
+  langBtn.textContent=T[L].toggle;
+  const tk=$('#takeaway'); if(tk) $('#takeaway-more').textContent = tk.classList.contains('open') ? T[L].less : T[L].more;
+}
+
+// ---- views ----
+const VIEWS=['overview','briefs','feed','tracks'].filter(v=>document.getElementById('view-'+v));
+function show(name, push){
+  if(!VIEWS.includes(name)) name='overview';
+  VIEWS.forEach(v=>{ document.getElementById('view-'+v).hidden = v!==name; });
+  $$('.tab').forEach(t=>t.classList.toggle('on', t.dataset.go===name));
+  if(push!==false){ try{ history.replaceState(null,'','#'+name); }catch(e){} }
+  window.scrollTo({top:0});
+}
+$$('[data-go]').forEach(el=>el.addEventListener('click',e=>{ e.preventDefault(); show(el.dataset.go); }));
+window.addEventListener('hashchange',()=>show(location.hash.slice(1), false));
+
+// ---- takeaway ----
+if($('#takeaway')) $('#takeaway-more').addEventListener('click',()=>{
+  $('#takeaway').classList.toggle('open'); applyLang(); });
+
+// ---- brief drawers ----
+function openBrief(id){ const d=document.getElementById(id); if(d && !d.open){ d.showModal(); d.querySelector('.drawer-in').scrollTop=0; } }
+$$('[data-open]').forEach(c=>{
+  c.addEventListener('click',()=>openBrief(c.dataset.open));
+  c.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); openBrief(c.dataset.open);} });
+});
+$$('dialog.drawer').forEach(d=>{
+  d.addEventListener('click',e=>{ if(e.target===d) d.close(); });
+  d.querySelector('[data-close]').addEventListener('click',()=>d.close());
+});
+
+// ---- feed ----
+const num=(r,k)=>parseFloat(r.dataset[k])||0;
+const CMP={
+  curated:(a,b)=>num(a,'curated')-num(b,'curated'),
+  score:  (a,b)=>num(b,'score')-num(a,'score'),
+  velocity:(a,b)=>num(b,'vel')-num(a,'vel'),
+  newest: (a,b)=>num(a,'age')-num(b,'age'),
+  stars:  (a,b)=>num(b,'stars')-num(a,'stars'),
+};
+function matches(r){
+  const t=q.value.toLowerCase().trim();
+  if(t && !r.dataset.text.includes(t)) return false;
+  if(state.src && !r.dataset.sources.split(' ').includes(state.src)) return false;
+  if(langSel.value && r.dataset.lang!==langSel.value) return false;
+  if(state.axes.size && !state.axes.has(r.dataset.axis)) return false;
+  if(state.themes.size){
+    const own=r.dataset.themes.split(' ').filter(Boolean);
+    if(!own.some(x=>state.themes.has(x))) return false;
+  }
+  return true;
+}
+function toggleGroup(name){
+  if(state.collapsed.has(name)) state.collapsed.delete(name); else state.collapsed.add(name);
+  render();
+}
+function header(name, n, closed){
+  const L=T[state.lang];
+  const tr=document.createElement('tr'); tr.className='grp'+(closed?' closed':'');
+  const td=document.createElement('td'); td.colSpan=3;
+  td.setAttribute('role','button'); td.tabIndex=0; td.setAttribute('aria-expanded', String(!closed));
+  const chev=document.createElement('b'); chev.className='chev'; td.appendChild(chev);
+  td.appendChild(document.createTextNode(themeLabel(name)));
+  const s=document.createElement('span'); s.textContent='  '+L.items(n)+(closed?L.hidden:'');
+  td.appendChild(s);
+  td.addEventListener('click',()=>toggleGroup(name));
+  td.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault();toggleGroup(name);} });
+  tr.appendChild(td); return tr;
+}
+function activeFilters(){ return (state.src?1:0)+state.themes.size+state.axes.size+(langSel.value?1:0); }
+function render(){
+  const L=T[state.lang];
+  let vis=items.filter(matches);
+  vis.sort(CMP[sortSel.value]||CMP.curated);
+  const total=vis.length, lim=parseInt(showSel.value,10);
+  if(lim>0) vis=vis.slice(0,lim);
+  items.forEach(r=>r.remove()); body.textContent='';
+  let hidden=0, groupNames=[];
+  if(state.group){
+    const groups=new Map();
+    vis.forEach(r=>{const k=r.dataset.primary||'other'; if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(r);});
+    const best=rs=>Math.max(...rs.map(r=>parseFloat(r.dataset.score)||0));
+    const ordered=[...groups.entries()].sort((a,b)=>{
+      if(a[0]==='other') return 1; if(b[0]==='other') return -1; return best(b[1])-best(a[1]);});
+    groupNames=ordered.map(g=>g[0]);
+    ordered.forEach(([name,rs])=>{
+      const closed=state.collapsed.has(name);
+      body.appendChild(header(name,rs.length,closed));
+      if(closed) hidden+=rs.length; else rs.forEach(r=>body.appendChild(r));
+    });
+  } else vis.forEach(r=>body.appendChild(r));
+  emptyEl.hidden = total>0;
+  countEl.textContent = L.count(vis.length-hidden, total, hidden, items.length);
+  groupBtn.classList.toggle('on', state.group);
+  collapseBtn.hidden = !state.group;
+  collapseBtn.textContent = groupNames.some(n=>state.collapsed.has(n)) ? L.expand : L.collapse;
+  const n=activeFilters(), badge=$('#filter-n'); badge.hidden=!n; badge.textContent=n;
+  save();
+}
+$('#filter-btn').addEventListener('click',()=>{ $('#filters').classList.toggle('open');
+  $('#filter-btn').classList.toggle('on', $('#filters').classList.contains('open')); });
+q.addEventListener('input',render);
+[showSel,sortSel,langSel].forEach(el=>el.addEventListener('change',render));
+groupBtn.addEventListener('click',()=>{state.group=!state.group;render();});
+collapseBtn.addEventListener('click',()=>{
+  const names=[...new Set(items.filter(matches).map(r=>r.dataset.primary||'other'))];
+  if(names.some(n=>state.collapsed.has(n))) names.forEach(n=>state.collapsed.delete(n));
+  else names.forEach(n=>state.collapsed.add(n));
+  render();});
+$$('button[data-src]').forEach(b=>b.addEventListener('click',()=>{
+  const v=b.dataset.src, on=state.src===v;
+  $$('button[data-src]').forEach(x=>x.classList.remove('on'));
+  state.src = on?'':v; if(!on) b.classList.add('on'); render();}));
+$$('button[data-axis]').forEach(b=>b.addEventListener('click',()=>{
+  const v=b.dataset.axis;
+  if(state.axes.has(v)){state.axes.delete(v); b.classList.remove('on');} else {state.axes.add(v); b.classList.add('on');}
+  render();}));
+$$('button[data-theme]').forEach(b=>b.addEventListener('click',()=>{
+  const v=b.dataset.theme;
+  if(state.themes.has(v)){state.themes.delete(v); b.classList.remove('on');} else {state.themes.add(v); b.classList.add('on');}
+  render();}));
+$('#reset').addEventListener('click',()=>{
+  q.value=''; langSel.value=''; state.src=''; state.themes.clear(); state.axes.clear();
+  $$('.chipset button').forEach(x=>x.classList.remove('on')); render();});
+document.addEventListener('keydown',e=>{
+  if(e.key==='/' && document.activeElement!==q && !document.querySelector('dialog[open]')){
+    e.preventDefault(); show('feed'); q.focus(); }
+  if(e.key==='Escape' && document.activeElement===q){q.value='';q.blur();render();}});
+$('#theme-toggle').addEventListener('click',()=>{
+  const cur=document.documentElement.getAttribute('data-theme');
+  const next = cur==='dark' ? 'light' : cur==='light' ? '' : 'dark';
+  if(next) document.documentElement.setAttribute('data-theme',next);
+  else document.documentElement.removeAttribute('data-theme');});
+langBtn.addEventListener('click',()=>{ state.lang = state.lang==='zh' ? 'en' : 'zh'; applyLang(); render(); });
+
+// ---- row actions ----
+async function call(path, body){
+  const r = await fetch(path, {method: body ? 'POST' : 'GET',
+    headers: {'Content-Type':'application/json','X-Radar-Token':API},
+    body: body ? JSON.stringify(body) : undefined});
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+function toast(msg, undo){
+  $$('.toast').forEach(t=>t.remove());
+  const t=document.createElement('div'); t.className='toast'; t.textContent=msg;
+  if(undo){ const b=document.createElement('button'); b.textContent = state.lang==='zh' ? '撤销' : 'undo';
+    b.onclick=()=>{ undo(); t.remove(); }; t.appendChild(b); }
+  document.body.appendChild(t); setTimeout(()=>t.remove(), 6000);
+}
+async function verdict(tr, status){
+  await call('/api/verdict', {key: tr.dataset.key, status});
+  tr.dataset.status = status; tr.classList.toggle('gone', status==='dismissed');
+  let tag = tr.querySelector('.tag.sv');
+  if(status==='saved' && !tag){ tag=document.createElement('span'); tag.className='tag sv';
+    tag.dataset.en='saved'; tag.dataset.zh='已保存'; tr.querySelector('.desc').after(tag); applyLang(); }
+  if(status!=='saved' && tag) tag.remove();
+}
+function legacyCopy(text){
+  const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select(); let ok=false; try{ ok=document.execCommand('copy'); }catch(e){}
+  ta.remove(); return ok;
+}
+async function copyText(text){
+  if(navigator.clipboard && window.isSecureContext){ try{ await navigator.clipboard.writeText(text); return true; }catch(e){} }
+  return legacyCopy(text);
+}
+$$('button.act').forEach(b=>b.addEventListener('click', async e=>{
+  e.preventDefault();
+  const tr=b.closest('tr'), zh=state.lang==='zh';
+  if(API){
+    try{
+      if(b.dataset.cmd==='note'){
+        const cur=(tr.querySelector('.note')||{}).textContent||'';
+        const note=window.prompt(zh?'备注：':'Note:', cur); if(note===null) return;
+        await call('/api/note', {key: tr.dataset.key, note});
+        let el=tr.querySelector('.note');
+        if(!el){ el=document.createElement('span'); el.className='note'; tr.querySelector('.desc').after(el); }
+        el.textContent=note; if(!note) el.remove(); return;
+      }
+      const target = b.dataset.cmd==='save' ? (tr.dataset.status==='saved' ? 'new' : 'saved') : 'dismissed';
+      const prev = tr.dataset.status;
+      await verdict(tr, target);
+      toast((zh ? {saved:'已保存', dismissed:'已忽略', new:'已取消保存'} : {saved:'saved', dismissed:'dismissed', new:'unsaved'})[target]
+            + ' · ' + tr.dataset.key, ()=>verdict(tr, prev));
+    }catch(err){ toast((zh?'失败：':'failed: ') + err.message); }
+    return;
+  }
+  // The published page is static: copy the command to run instead.
+  const cmd=`radar ${b.dataset.cmd} ${tr.dataset.key}`, ok=await copyText(cmd), was=b.textContent;
+  if(ok){ b.textContent=T[state.lang].copied; b.classList.add('done');
+    setTimeout(()=>{b.textContent=was; b.classList.remove('done');},1400); }
+  else { let code=b.parentNode.querySelector('code');
+    if(!code){ code=document.createElement('code'); code.className='cmd'; b.parentNode.appendChild(code); }
+    code.textContent=cmd; b.classList.add('done'); }
+}));
+if(API) $$('button.dive-btn').forEach(b=>b.addEventListener('click', async ()=>{
+  const zh=state.lang==='zh';
+  try{
+    await call('/api/dive', {brief: b.dataset.brief});
+    b.disabled=true; b.textContent = zh ? '核实中，可能要几分钟…' : 'Checking, may take minutes…';
+    const poll=setInterval(async ()=>{
+      const jobs=await call('/api/jobs'); const j=jobs[b.dataset.brief];
+      if(j && j.state!=='running'){ clearInterval(poll);
+        if(j.state==='done') location.reload();
+        else { b.disabled=false; b.textContent=(zh?'失败：':'failed: ')+j.error; } }
+    }, 5000);
+  }catch(err){ toast((zh?'失败：':'failed: ') + err.message); }
+}));
+
+applyLang();
+render();
+show(location.hash.slice(1) || 'overview', false);
+})();
+</script>
+</body></html>
