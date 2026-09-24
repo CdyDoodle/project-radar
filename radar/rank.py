@@ -136,6 +136,11 @@ def velocity(item: Item, corpus: Corpus | None = None, cfg: Config | None = None
     paper_scale = float(cfg.get("rank.paper_velocity_scale", 0.75)) if cfg else 0.75
     for name in VELOCITY_METRICS:
         raw = m.get(name) or 0
+        if name == "stars_per_day" and m.get("stars_per_day_recent") is not None:
+            # Measured between runs, so it reflects now. The lifetime average
+            # (stars / age) hides an old repo that just took off and flatters
+            # one that peaked a year ago. Same units, same distribution.
+            raw = m["stars_per_day_recent"]
         if not raw:
             continue
         pct = corpus.percentile(name, raw) if corpus else None
@@ -314,14 +319,52 @@ def rank_all(store, cfg: Config) -> list:
     """Rescore everything in the store. Cheap -- run it after any config change."""
     rows = store.items(include_dismissed=True, include_forgotten=True)
     items = [(row, store.to_item(row)) for row in rows]
+    history = store.snapshot_history() if hasattr(store, "snapshot_history") else {}
+    min_gap = float(cfg.get("rank.recent_min_days", 1.0))
+    for _, item in items:
+        rate = recent_rate(history.get(item.key, []), min_gap)
+        if rate is not None:
+            item.metrics["stars_per_day_recent"] = rate
     # Velocity percentiles come from what is still being seen. Forgotten items
     # keep frozen metrics forever and would skew the distribution.
     corpus = Corpus([it for row, it in items if store.is_active(row)])
     with store.tx():
         for row, item in items:
             total, breakdown = score_item(item, cfg, row, corpus)
+            signals = growth_signals(item)
+            if signals:
+                breakdown["signals"] = signals
             store.set_score(row["id"], total, breakdown)
     return store.items(include_dismissed=False)
+
+
+def recent_rate(snaps: list, min_gap_days: float = 1.0) -> float | None:
+    """Stars per day between the newest snapshot and the latest one at least
+    `min_gap_days` older. None until two such readings exist."""
+    from datetime import datetime
+    usable = [s for s in snaps if s["stars"] is not None]
+    if len(usable) < 2:
+        return None
+    newest = usable[-1]
+    t1 = datetime.fromisoformat(newest["at"])
+    for older in reversed(usable[:-1]):
+        days = (t1 - datetime.fromisoformat(older["at"])).total_seconds() / 86400
+        if days >= min_gap_days:
+            return round(max(0.0, (newest["stars"] - older["stars"]) / days), 2)
+    return None
+
+
+def growth_signals(item: Item) -> dict:
+    """Recent rate against the lifetime average, for display and the
+    "breaking out" lane. accel 2.0 = growing twice as fast as it ever has."""
+    recent = item.metrics.get("stars_per_day_recent")
+    if recent is None:
+        return {}
+    lifetime = item.metrics.get("stars_per_day") or 0
+    out = {"stars_per_day_recent": recent}
+    if lifetime > 0:
+        out["accel"] = round(recent / lifetime, 2)
+    return out
 
 
 # Display names for the score components and penalties, per language.

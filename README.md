@@ -85,6 +85,13 @@ Penalties: `slop` (awesome-lists, tutorials, prompt collections), `chatter`
 (a blog post with no code behind it), `stale`, `archived`, `mega` (already
 famous — you can't do frontier work where everyone already is), `seen_before`.
 
+Stars per day is measured, not averaged. Every run stores a snapshot of each
+item's counters, and once two readings at least a day apart exist, velocity uses
+the stars gained between them instead of `stars / age`. The lifetime average
+hid an old repo that just took off and flattered one that peaked a year ago.
+Items growing at least twice their lifetime pace, at 5+ stars a day, get their
+own **Breaking out** lane.
+
 `velocity` is a percentile against the live corpus, not a fixed ceiling. A fixed
 ceiling collapses: capping stars/day at 40 when real values run 39–658 pinned a
 sixth of the top 50 at exactly 1.00 and destroyed all ordering inside whatever
@@ -360,7 +367,8 @@ never invents a gap. GitHub search allows 30 requests a minute, so unchecked
 papers take about two seconds each; results are kept for 14 days.
 
 ```bash
-.adar.cmd gaps
+.
+adar.cmd gaps
 ```
 
 lists the gaps with their upvotes and scores, checking any that are due first.

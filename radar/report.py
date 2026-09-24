@@ -584,7 +584,10 @@ def _metrics_line(metrics: dict) -> dict:
     en, zh = [], []
     if metrics.get("stars"):
         en.append(f"{int(metrics['stars']):,}*"); zh.append(f"{int(metrics['stars']):,} 星")
-    if metrics.get("stars_per_day"):
+    if metrics.get("stars_per_day_recent") is not None:
+        r = metrics["stars_per_day_recent"]
+        en.append(f"{r}/day now"); zh.append(f"近期 {r}/天")
+    elif metrics.get("stars_per_day"):
         en.append(f"{metrics['stars_per_day']}/day"); zh.append(f"{metrics['stars_per_day']}/天")
     if metrics.get("hn_points"):
         en.append(f"HN {int(metrics['hn_points'])}"); zh.append(f"HN {int(metrics['hn_points'])} 分")
@@ -606,7 +609,7 @@ def _metrics_line(metrics: dict) -> dict:
     return _both("  ".join(en), "  ".join(zh))
 
 
-def _reason(item, sources: list[str], is_new: bool) -> dict:
+def _reason(item, sources: list[str], is_new: bool, signals: dict | None = None) -> dict:
     """Why this item is worth a glance, built from signals already computed.
 
     Deterministic on purpose: the briefs section needs Claude Code, and the
@@ -616,7 +619,13 @@ def _reason(item, sources: list[str], is_new: bool) -> dict:
     if is_new:
         en.append("new this run"); zh.append("本次新增")
     m = item.metrics
-    if m.get("stars_per_day"):
+    sig = signals or {}
+    if sig.get("stars_per_day_recent") is not None:
+        r = sig["stars_per_day_recent"]
+        en.append(f"{r}/day lately"); zh.append(f"近期每天 {r} 星")
+        if sig.get("accel", 0) >= 2:
+            en.append(f"{sig['accel']}x its usual pace"); zh.append(f"是平常的 {sig['accel']} 倍")
+    elif m.get("stars_per_day"):
         en.append(f"{m['stars_per_day']}/day"); zh.append(f"每天 {m['stars_per_day']} 星")
     if m.get("stars"):
         en.append(f"{int(m['stars']):,} stars"); zh.append(f"{int(m['stars']):,} 星")
@@ -655,6 +664,9 @@ LANES = {
                       "相对整个语料库的星增速，不含已成名的仓库")),
     "agree": (_both("Several sources agree", "多个来源共同提到"),
               _both("independent corroboration is the strongest signal here", "多个来源独立印证是这里最强的信号")),
+    "breakout": (_both("Breaking out", "正在爆发"),
+                 _both("growing at least twice as fast as its lifetime average, measured between runs",
+                       "两次运行之间测得的增速，至少是其历史平均的两倍")),
     "watchlist": (_both("From your watchlist", "来自你的关注列表"),
                   _both("engineers whose taste you chose to borrow", "你选择借鉴其眼光的工程师")),
     "papers": (_both("Papers nobody has implemented", "尚无人实现的论文"),
@@ -679,12 +691,14 @@ def _highlights(store: Store, cfg: Config, since: str | None,
     prepared = []
     for row in pool:
         item = store.to_item(row)
-        penalties = json.loads(row["breakdown"] or "{}").get("penalties", {})
+        bd = json.loads(row["breakdown"] or "{}")
+        penalties = bd.get("penalties", {})
         prepared.append({
             "row": row, "item": item,
             "sources": sorted(item.sources),
             "is_new": bool(since and (row["first_seen"] or "") >= since),
             "mega": "mega" in penalties,
+            "signals": bd.get("signals", {}),
         })
 
     def entry(p) -> dict:
@@ -697,7 +711,7 @@ def _highlights(store: Store, cfg: Config, since: str | None,
             "score": p["row"]["score"],
             "axis": _both(axis.label(ax), axis.label(ax, "zh")),
             "theme": _both(th, themes.label(th, "zh")),
-            "reason": _reason(item, p["sources"], p["is_new"]),
+            "reason": _reason(item, p["sources"], p["is_new"], p["signals"]),
         }
 
     used: set[str] = set()
@@ -723,6 +737,11 @@ def _highlights(store: Store, cfg: Config, since: str | None,
         ("fastest", take(sorted(
             [p for p in prepared if p["item"].metrics.get("stars_per_day") and not p["mega"]],
             key=lambda p: -p["item"].metrics["stars_per_day"]))),
+        ("breakout", take(sorted(
+            [p for p in prepared if not p["mega"]
+             and (p["signals"].get("accel") or 0) >= 2
+             and (p["signals"].get("stars_per_day_recent") or 0) >= 5],
+            key=lambda p: -p["signals"]["stars_per_day_recent"]))),
         ("agree", take([p for p in by_score if len(p["sources"]) > 1])),
         ("watchlist", take([p for p in by_score
                             if p["item"].metrics.get("starred_by") or p["item"].metrics.get("worked_on_by")])),
@@ -767,7 +786,7 @@ def _rows(store: Store, cfg: Config, limit: int) -> list[dict]:
             "axis": ax,
             "axis_label": _both(axis.label(ax), axis.label(ax, "zh")),
             "why": _both(explain(breakdown), explain(breakdown, "zh")),
-            "metrics_line": _metrics_line(item.metrics),
+            "metrics_line": _metrics_line({**item.metrics, **breakdown.get("signals", {})}),
             "velocity": round(breakdown.get("components", {}).get("velocity", 0), 4),
             "age_days": round(age, 1) if age is not None else 99999,
             "stars": int(item.metrics.get("stars") or 0),
