@@ -55,6 +55,7 @@ def canonical_key(url: str) -> str:
 SNAPSHOT_METRICS = frozenset({
     "stars", "forks", "open_issues", "age_days", "stars_per_day",
     "days_since_push", "archived", "fork", "stars_today", "stars_this_week",
+    "impl_count", "impl_checked_at",
 })
 MAX_EVIDENCE = 12
 

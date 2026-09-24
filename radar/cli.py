@@ -180,6 +180,13 @@ def cmd_run(args) -> int:
         n = collect.enrich(cfg, store, limit=int(cfg.get("brief.cards", 18)))
     console.print(f"[green]enrich[/]  {n} READMEs")
 
+    if cfg.get("gaps.enabled", True):
+        from radar import gaps as gp
+        with console.status("checking top papers for existing code..."):
+            g = gp.check(cfg, store, collect.make_http(cfg))
+        console.print(f"[green]gaps[/]    {g['checked']} papers checked, "
+                      f"{g['no_code']} with no implementation")
+
     if args.no_llm:
         console.print("[yellow]skipping Claude passes (--no-llm)[/]")
     else:
@@ -345,6 +352,33 @@ def cmd_tune(args) -> int:
         console.print(f"  [green]wrote[/] {change}")
     rank.rank_all(store, config.load(args.home))
     console.print("rescored with the new weights")
+    return 0
+
+
+def cmd_gaps(args) -> int:
+    from radar import gaps as gp
+    cfg, store = _open(config.load(args.home))
+    if not args.no_check:
+        with console.status("checking papers for existing code (paced for GitHub search)..."):
+            st = gp.check(cfg, store, collect.make_http(cfg), limit=args.check, recheck=args.recheck)
+        console.print(f"checked {st['checked']}: [green]{st['no_code']} with no code[/], "
+                      f"{st['with_code']} with code" + (f", {st['failed']} failed" if st["failed"] else ""))
+    rows = gp.gaps(store, limit=args.limit)
+    if not rows:
+        console.print("no checked paper without code yet")
+        return 0
+    table = Table(title="papers nobody has implemented", show_edge=False, header_style="dim")
+    table.add_column("score", justify="right")
+    table.add_column("paper", overflow="fold")
+    table.add_column("signal", overflow="fold", style="dim")
+    for r in rows:
+        m = json.loads(r["metrics"] or "{}")
+        sig = " · ".join(x for x in [
+            f"{m['hf_upvotes']} HF upvotes" if m.get("hf_upvotes") else "",
+            f"HN {m['hn_points']}" if m.get("hn_points") else "",
+            m.get("arxiv_category", "")] if x)
+        table.add_row(f"{r['score']:.2f}", f"[link={r['url']}]{r['title']}[/]\n[dim]{r['url']}[/]", sig)
+    console.print(table)
     return 0
 
 
@@ -564,6 +598,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--strength", type=float, default=1.0,
                    help="pull toward the current weights (higher = more cautious)")
     s.set_defaults(fn=cmd_tune)
+
+    s = sub.add_parser("gaps", help="papers checked to have no implementation")
+    s.add_argument("-n", "--limit", type=int, default=20)
+    s.add_argument("--check", type=int, help="how many unchecked papers to check now")
+    s.add_argument("--recheck", action="store_true", help="check again even if checked recently")
+    s.add_argument("--no-check", action="store_true", help="just list, no network")
+    s.set_defaults(fn=cmd_gaps)
 
     s = sub.add_parser("prune", help="delete items no recent run has seen")
     s.add_argument("--dry-run", action="store_true")

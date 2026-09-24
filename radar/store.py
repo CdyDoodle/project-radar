@@ -387,6 +387,16 @@ class Store:
         self.conn.commit()
         return cur.rowcount
 
+    def update_metrics(self, key: str, values: dict) -> None:
+        """Merge values into an item's metrics without counting a sighting."""
+        row = self.conn.execute("SELECT metrics FROM items WHERE key = ?", (key,)).fetchone()
+        if not row:
+            return
+        metrics = {**json.loads(row["metrics"] or "{}"), **values}
+        self.conn.execute("UPDATE items SET metrics = ? WHERE key = ?",
+                          (json.dumps(metrics, default=str), key))
+        self.conn.commit()
+
     def set_note(self, ident: str, note: str) -> int:
         cur = self.conn.execute(
             "UPDATE items SET note = ? WHERE id = ? OR key = ?", (note.strip(), ident, ident))

@@ -636,6 +636,12 @@ def _reason(item, sources: list[str], is_new: bool) -> dict:
         en.append(f"{len(sources)} sources agree"); zh.append(f"{len(sources)} 个来源共同提到")
     if m.get("arxiv_category"):
         en.append(m["arxiv_category"]); zh.append(m["arxiv_category"])
+    if m.get("impl_checked_at"):
+        if m.get("impl_count"):
+            repo = (m.get("impl_repos") or ["?"])[0]
+            en.append(f"has code: {repo}"); zh.append(f"已有代码：{repo}")
+        else:
+            en.append("no code found"); zh.append("未找到代码")
     return _both(" · ".join(en), " · ".join(zh))
 
 
@@ -651,8 +657,12 @@ LANES = {
               _both("independent corroboration is the strongest signal here", "多个来源独立印证是这里最强的信号")),
     "watchlist": (_both("From your watchlist", "来自你的关注列表"),
                   _both("engineers whose taste you chose to borrow", "你选择借鉴其眼光的工程师")),
-    "papers": (_both("Papers, usually with no implementation", "论文，通常还没有实现"),
-               _both("where the gap is the project", "空白本身就是项目")),
+    "papers": (_both("Papers nobody has implemented", "尚无人实现的论文"),
+               _both("checked: no code on Hugging Face or GitHub. The gap is the project",
+                     "已核实：Hugging Face 和 GitHub 上都没有代码。空白本身就是项目")),
+    "papers_unchecked": (_both("Papers, not yet checked for code", "论文，尚未核实是否有代码"),
+                         _both("run radar gaps to check which have no implementation",
+                               "运行 radar gaps 核实哪些还没有实现")),
 }
 
 
@@ -716,8 +726,13 @@ def _highlights(store: Store, cfg: Config, since: str | None,
         ("agree", take([p for p in by_score if len(p["sources"]) > 1])),
         ("watchlist", take([p for p in by_score
                             if p["item"].metrics.get("starred_by") or p["item"].metrics.get("worked_on_by")])),
-        ("papers", take([p for p in by_score if p["row"]["key"].startswith("arxiv:")])),
     ]
+    papers = [p for p in by_score if p["row"]["key"].startswith("arxiv:")]
+    checked = [p for p in papers if p["item"].metrics.get("impl_checked_at")]
+    if checked:
+        lanes.append(("papers", take([p for p in checked if not p["item"].metrics.get("impl_count")])))
+    else:
+        lanes.append(("papers_unchecked", take(papers)))
     return [{"key": k, "title": LANES[k][0], "note": LANES[k][1], "items": i}
             for k, i in lanes if i]
 

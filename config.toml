@@ -289,6 +289,15 @@ timeout_seconds = 1200
 # one per week. Each page is about half a megabyte.
 archive_keep_days = 30
 
+[gaps]
+# `radar run` checks the top papers for existing code (a linked repo on
+# Hugging Face, or a GitHub repo citing the arXiv number) so the dashboard
+# can list papers nobody has implemented. GitHub search allows 30 requests a
+# minute, so this is paced: about 2 seconds per unchecked paper.
+enabled = true
+check = 25
+recheck_days = 14
+
 [dive]
 # `radar dive <n>` gives Claude Code web search and fetch to check a brief:
 # existing implementations, real novelty, a runnable two-week experiment.

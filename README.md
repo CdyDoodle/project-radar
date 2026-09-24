@@ -344,11 +344,34 @@ never over the `index.html` that `publish` ships.
 Every save, dismiss and undo, from here or the CLI, is logged with the item's
 score breakdown at that moment. That log is what `radar tune` learns from.
 
+## Papers nobody has implemented
+
+A strong paper with no code is the most direct project there is: the thesis is
+written and the gap is real. `radar run` checks the top 25 papers (`[gaps]`) for
+existing code, and the dashboard's papers lane lists only the ones checked to
+have none. The lane used to assume it.
+
+A paper counts as implemented if Hugging Face links a repo, or if a GitHub repo
+cites its arXiv number in the README or description and actually contains code.
+Paper lists, daily digests, reading notes and personal sites cite arXiv numbers
+too, so repos named like those, or with no programming language, don't count.
+The check leans toward "has code": a leftover false match hides a paper, it
+never invents a gap. GitHub search allows 30 requests a minute, so unchecked
+papers take about two seconds each; results are kept for 14 days.
+
+```bash
+.adar.cmd gaps
+```
+
+lists the gaps with their upvotes and scores, checking any that are due first.
+
 ## Learning your taste
 
 ```bash
-.adar.cmd tune
-.adar.cmd tune --apply
+.
+adar.cmd tune
+.
+adar.cmd tune --apply
 ```
 
 Once you have saved and dismissed at least five items each, `tune` proposes
@@ -386,6 +409,7 @@ radar undo      clear a save or dismiss
 radar dive      check a brief against the web (radar dive 3; --list)
 radar serve     the dashboard on localhost, with working buttons
 radar tune      learn ranking weights from your saves and dismissals (--apply)
+radar gaps      papers checked to have no implementation
 radar prune     delete items no recent run has seen (--dry-run to count)
 radar hydrate   backfill GitHub metadata for repos stored without it
 radar publish   build the report and push it to GitHub Pages
