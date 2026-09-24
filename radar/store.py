@@ -174,8 +174,21 @@ def _migrate_2(conn: sqlite3.Connection) -> None:
     """)
 
 
+def _migrate_3(conn: sqlite3.Connection) -> None:
+    """Stored translations of page content, keyed by a hash of the source."""
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS translations (
+        src_hash   TEXT NOT NULL,
+        lang       TEXT NOT NULL,
+        source     TEXT NOT NULL,
+        text       TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (src_hash, lang)
+    )""")
+
+
 # Each entry upgrades the database by one version (PRAGMA user_version).
-MIGRATIONS = [_migrate_1, _migrate_2]
+MIGRATIONS = [_migrate_1, _migrate_2, _migrate_3]
 
 
 class Store:
@@ -441,6 +454,19 @@ class Store:
         payload = json.loads(r["payload"])
         payload["_id"], payload["_run"] = r["id"], r["run_id"]
         return payload
+
+    # -- translations -------------------------------------------------------------
+    def translations(self, lang: str) -> dict[str, str]:
+        return {r["src_hash"]: r["text"] for r in self.conn.execute(
+            "SELECT src_hash, text FROM translations WHERE lang = ?", (lang,))}
+
+    def put_translations(self, lang: str, rows: list[tuple[str, str, str]]) -> None:
+        """rows: (src_hash, source, text)."""
+        ts = now().isoformat()
+        with self.tx():
+            self.conn.executemany(
+                "INSERT OR REPLACE INTO translations (src_hash, lang, source, text, created_at) "
+                "VALUES (?,?,?,?,?)", [(h, lang, s, t, ts) for h, s, t in rows])
 
     # -- snapshots --------------------------------------------------------------
     def snapshot(self, item: Item, run: int) -> None:

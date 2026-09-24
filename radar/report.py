@@ -19,6 +19,7 @@ from datetime import datetime
 from pathlib import Path
 
 from jinja2 import Environment
+from markupsafe import Markup
 
 from radar import axis, diversify, themes
 from radar.config import Config
@@ -121,9 +122,9 @@ tr.item:hover .acts button,.acts button:focus-visible,.acts button.done{opacity:
     <div class="past-run">
       <h3>{{ t.name }}<span data-en="{{ t.new|length }} new this run &middot; {{ t.hits|length }} total &middot; since {{ t.created_at[:10] }}" data-zh="本次新增 {{ t.new|length }} &middot; 共 {{ t.hits|length }} &middot; 自 {{ t.created_at[:10] }}"></span></h3>
       {% for h in (t.new or t.hits)[:6] %}
-      <div class="past"><a href="{{ h.url }}"><b>{{ h.title[:110] }}</b></a>
+      <div class="past"><a href="{{ h.url }}"><b>{{ TT(h.title[:110], h.key) }}</b></a>
         {% if h.run == run_no %}<span class="tag th" data-en="new" data-zh="新"></span>{% endif %}
-        <span class="one">{{ h.reason }}</span></div>
+        <span class="one">{{ T(h.reason) }}</span></div>
       {% else %}
       <div class="past"><span class="one" data-en="Nothing found yet in radar, on GitHub or on arXiv." data-zh="radar、GitHub 和 arXiv 上都还没有发现相关内容。"></span></div>
       {% endfor %}
@@ -134,7 +135,7 @@ tr.item:hover .acts button,.acts button:focus-visible,.acts button.done{opacity:
 {% endif %}
 
 {% if summary %}
-<div class="summary"><strong data-en="Where the board is pointing." data-zh="整体信号指向。"></strong> {{ summary }}</div>
+<div class="summary"><strong data-en="Where the board is pointing." data-zh="整体信号指向。"></strong> {{ T(summary) }}</div>
 {% endif %}
 
 {% if highlights %}
@@ -149,10 +150,10 @@ tr.item:hover .acts button,.acts button:focus-visible,.acts button.done{opacity:
       {% for it in lane['items'] %}
       <div class="pick">
         <div class="pick-h">
-          <a href="{{ it.url }}">{{ it.title }}</a>
+          <a href="{{ it.url }}">{{ TT(it.title, it.key) }}</a>
           <span class="pick-score">{{ '%.2f'|format(it.score) }}</span>
         </div>
-        {% if it.summary %}<div class="pick-sum">{{ it.summary[:150] }}</div>{% endif %}
+        {% if it.summary %}<div class="pick-sum">{{ T(it.summary[:150]) }}</div>{% endif %}
         <div class="pick-why">
           <span class="tag ax" data-en="{{ it.axis.en }}" data-zh="{{ it.axis.zh }}"></span><span class="tag th" data-en="{{ it.theme.en }}" data-zh="{{ it.theme.zh }}"></span>
           <span data-en="{{ it.reason.en }}" data-zh="{{ it.reason.zh }}"></span>
@@ -169,29 +170,29 @@ tr.item:hover .acts button,.acts button:focus-visible,.acts button.done{opacity:
 <h2 data-en="Project briefs" data-zh="项目简报"></h2>
 {% for b in briefs %}
 <article class="brief">
-  <h3>{{ loop.index }}. {{ b.title }}</h3>
-  <div class="one">{{ b.one_liner }}</div>
+  <h3>{{ loop.index }}. {{ T(b.title) }}</h3>
+  <div class="one">{{ T(b.one_liner) }}</div>
   <div class="pills">
     <span class="pill hot" data-en="difficulty {{ b.difficulty }}/5" data-zh="难度 {{ b.difficulty }}/5"></span>
     <span class="pill" data-en="novelty {{ b.novelty }}/5" data-zh="新颖度 {{ b.novelty }}/5"></span>
     <span class="pill" data-en="~{{ b.effort_weeks }} weeks" data-zh="约 {{ b.effort_weeks }} 周"></span>
-    {% if b.ai_leverage %}<span class="pill ok">AI: {{ b.ai_leverage[:60] }}</span>{% endif %}
+    {% if b.ai_leverage %}<span class="pill ok">AI: {{ T(b.ai_leverage[:60]) }}</span>{% endif %}
   </div>
-  <p>{{ b.pitch }}</p>
-  <p><strong data-en="Why now." data-zh="为什么是现在。"></strong> {{ b.why_now }}</p>
+  <p>{{ T(b.pitch) }}</p>
+  <p><strong data-en="Why now." data-zh="为什么是现在。"></strong> {{ T(b.why_now) }}</p>
   <div class="cols">
     <div class="blk"><h4 data-en="Hard parts" data-zh="难点"></h4><ul>
-      {% for h in b.hard_parts %}<li>{{ h }}</li>{% endfor %}</ul></div>
+      {% for h in b.hard_parts %}<li>{{ T(h) }}</li>{% endfor %}</ul></div>
     <div class="blk"><h4 data-en="You will learn" data-zh="你会学到"></h4><ul>
-      {% for h in b.you_will_learn %}<li>{{ h }}</li>{% endfor %}</ul></div>
+      {% for h in b.you_will_learn %}<li>{{ T(h) }}</li>{% endfor %}</ul></div>
   </div>
   <div class="cols">
     <div class="blk"><h4 data-en="Milestones" data-zh="里程碑"></h4><ul>
-      {% for m in b.milestones %}<li>{{ m }}</li>{% endfor %}</ul></div>
+      {% for m in b.milestones %}<li>{{ T(m) }}</li>{% endfor %}</ul></div>
     <div class="blk"><h4 data-en="Prior art" data-zh="已有工作"></h4><ul>
-      {% for p in b.prior_art %}<li>{{ p }}</li>{% endfor %}</ul></div>
+      {% for p in b.prior_art %}<li>{{ T(p) }}</li>{% endfor %}</ul></div>
   </div>
-  <div class="kill"><b data-en="Kill criteria." data-zh="放弃标准。"></b> {{ b.kill_criteria }}</div>
+  <div class="kill"><b data-en="Kill criteria." data-zh="放弃标准。"></b> {{ T(b.kill_criteria) }}</div>
   <div class="srcs">{% for u in b.source_urls %}<a href="{{ u }}">{{ u }}</a><br>{% endfor %}</div>
   {% set d = dives.get(b._id) %}
   {% if d %}
@@ -202,25 +203,25 @@ tr.item:hover .acts button,.acts button:focus-visible,.acts button.done{opacity:
       <span class="pill" data-en="novelty {{ b.novelty }}/5 &rarr; {{ d.novelty_revised }}/5" data-zh="新颖度 {{ b.novelty }}/5 &rarr; {{ d.novelty_revised }}/5"></span>
       <span class="hl-stat" data-en="{{ d.dived_at[:10] }}" data-zh="{{ d.dived_at[:10] }}"></span>
     </summary>
-    <p>{{ d.verdict_reason }}</p>
-    <p><strong data-en="Novelty." data-zh="新颖度。"></strong> {{ d.novelty_reason }}</p>
+    <p>{{ T(d.verdict_reason) }}</p>
+    <p><strong data-en="Novelty." data-zh="新颖度。"></strong> {{ T(d.novelty_reason) }}</p>
     {% if d.prior_art %}
     <div class="blk"><h4 data-en="Prior art found" data-zh="找到的已有工作"></h4><ul>
       {% for a in d.prior_art %}<li><span class="tag {{ 'ok' if a.verified else 'bad' }}" data-en="{{ 'link ok' if a.verified else 'link failed' }}" data-zh="{{ '链接有效' if a.verified else '链接失效' }}"></span>
         <span class="tag" data-en="{{ a.closeness }}" data-zh="{{ {'same':'相同','overlapping':'大量重叠','adjacent':'相关'}[a.closeness] }}"></span>
-        <a href="{{ a.url }}">{{ a.name }}</a>{% if a.stars %} <span class="why">{{ '{:,}'.format(a.stars) }}*</span>{% endif %} &mdash; {{ a.note }}</li>{% endfor %}
+        <a href="{{ a.url }}">{{ a.name }}</a>{% if a.stars %} <span class="why">{{ '{:,}'.format(a.stars) }}*</span>{% endif %} &mdash; {{ T(a.note) }}</li>{% endfor %}
     </ul></div>
     {% endif %}
     <div class="cols">
       <div class="blk"><h4 data-en="Two-week experiment" data-zh="两周实验"></h4>
-        <p style="margin:0 0 6px">{{ d.two_week_experiment.goal }}</p><ul>
-        {% for st in d.two_week_experiment.steps %}<li>{{ st }}</li>{% endfor %}</ul>
-        <p style="margin:6px 0 0"><b data-en="Measure:" data-zh="衡量："></b> {{ d.two_week_experiment.success_metric }}<br>
-        <b data-en="Stop if:" data-zh="放弃条件："></b> {{ d.two_week_experiment.kill_threshold }}</p></div>
+        <p style="margin:0 0 6px">{{ T(d.two_week_experiment.goal) }}</p><ul>
+        {% for st in d.two_week_experiment.steps %}<li>{{ T(st) }}</li>{% endfor %}</ul>
+        <p style="margin:6px 0 0"><b data-en="Measure:" data-zh="衡量："></b> {{ T(d.two_week_experiment.success_metric) }}<br>
+        <b data-en="Stop if:" data-zh="放弃条件："></b> {{ T(d.two_week_experiment.kill_threshold) }}</p></div>
       <div class="blk"><h4 data-en="Risks" data-zh="风险"></h4><ul>
-        {% for r in d.risks %}<li>{{ r }}</li>{% endfor %}</ul>
-        {% if d.needs %}<h4 data-en="Needs" data-zh="需要"></h4><ul>{% for n in d.needs %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}
-        {% if d.pivot_ideas %}<h4 data-en="Sharper angles" data-zh="更好的切入点"></h4><ul>{% for n in d.pivot_ideas %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}
+        {% for r in d.risks %}<li>{{ T(r) }}</li>{% endfor %}</ul>
+        {% if d.needs %}<h4 data-en="Needs" data-zh="需要"></h4><ul>{% for n in d.needs %}<li>{{ T(n) }}</li>{% endfor %}</ul>{% endif %}
+        {% if d.pivot_ideas %}<h4 data-en="Sharper angles" data-zh="更好的切入点"></h4><ul>{% for n in d.pivot_ideas %}<li>{{ T(n) }}</li>{% endfor %}</ul>{% endif %}
       </div>
     </div>
   </details>
@@ -241,8 +242,8 @@ tr.item:hover .acts button,.acts button:focus-visible,.acts button.done{opacity:
     <div class="past-run">
       <h3>{{ run.date }}<span data-en="{{ run.briefs|length }} briefs" data-zh="{{ run.briefs|length }} 份"></span></h3>
       {% for b in run.briefs %}
-      <div class="past"><b>{{ b.title }}</b>
-        <span class="one">{{ b.one_liner }}</span>
+      <div class="past"><b>{{ T(b.title) }}</b>
+        <span class="one">{{ T(b.one_liner) }}</span>
         <span class="pill hot" data-en="difficulty {{ b.difficulty }}/5" data-zh="难度 {{ b.difficulty }}/5"></span><span class="pill" data-en="novelty {{ b.novelty }}/5" data-zh="新颖度 {{ b.novelty }}/5"></span><span class="pill" data-en="~{{ b.effort_weeks }} weeks" data-zh="约 {{ b.effort_weeks }} 周"></span>
       </div>
       {% endfor %}
@@ -299,7 +300,7 @@ tr.item:hover .acts button,.acts button:focus-visible,.acts button.done{opacity:
 {% for r in rows %}
 <tr class="item"
     data-key="{{ r.key }}" data-status="{{ r.status }}"
-    data-text="{{ (r.title ~ ' ' ~ r.summary ~ ' ' ~ (r.lang or '') ~ ' ' ~ r.topics|join(' ') ~ ' ' ~ r.themes|join(' '))|lower }}"
+    data-text="{{ (r.title ~ ' ' ~ r.summary ~ ' ' ~ (r.lang or '') ~ ' ' ~ r.topics|join(' ') ~ ' ' ~ r.themes|join(' ') ~ ' ' ~ (tr(r.summary[:190]) or '') ~ ' ' ~ (tr(r.title) or ''))|lower }}"
     data-sources="{{ r.sources|join(' ') }}"
     data-themes="{{ r.themes|join(' ') }}"
     data-primary="{{ r.primary }}" data-axis="{{ r.axis }}"
@@ -309,9 +310,9 @@ tr.item:hover .acts button,.acts button:focus-visible,.acts button.done{opacity:
     data-curated="{{ loop.index0 }}">
   <td class="score">{{ '%.2f'|format(r.score) }}</td>
   <td>
-    <a href="{{ r.url }}" class="item-title">{{ r.title }}</a>
+    <a href="{{ r.url }}" class="item-title">{{ TT(r.title, r.key) }}</a>
     <span class="acts"><button class="act" data-cmd="save" data-en="save" data-zh="保存"></button><button class="act" data-cmd="dismiss" data-en="dismiss" data-zh="忽略"></button>{% if api %}<button class="act" data-cmd="note" data-en="note" data-zh="备注"></button>{% endif %}</span>
-    <span class="desc">{{ r.summary[:190] }}</span>
+    <span class="desc">{{ T(r.summary[:190]) }}</span>
     {% if r.status == 'saved' %}<span class="tag sv" data-en="saved" data-zh="已保存"></span>{% endif %}
     {% if r.note %}<span class="note">{{ r.note }}</span>{% endif %}
     <span class="tag ax" data-en="{{ r.axis_label.en }}" data-zh="{{ r.axis_label.zh }}"></span>
@@ -727,7 +728,7 @@ def _highlights(store: Store, cfg: Config, since: str | None,
         ax = axis.of_item(item)
         th = themes.primary(themes.of_item(item))
         return {
-            "title": item.title, "url": item.url,
+            "title": item.title, "url": item.url, "key": item.key,
             "summary": (item.summary or "").strip(),
             "score": p["row"]["score"],
             "axis": _both(axis.label(ax), axis.label(ax, "zh")),
@@ -833,12 +834,18 @@ def _past_briefs(store: Store, current_run: str, max_runs: int = 5) -> list[dict
 
 
 def build(cfg: Config, store: Store, run_id: str | None = None,
-          feed_limit: int = 250, api_token: str | None = None) -> tuple[Path, Path]:
+          feed_limit: int = 250, api_token: str | None = None,
+          record: set | None = None) -> tuple[Path, Path]:
     """Write the dashboard and digest.
 
     `api_token` is set only by `radar serve`: the page then talks to the local
     server. The published page never carries one and stays fully static.
+
+    `record` is for radar.translate: render without writing anything, adding
+    every content string the page shows to the set.
     """
+    from radar.translate import Translator
+    tr = Translator(store, record)
     lang = norm_lang(cfg.get("report.language", "en"))
     run_id = run_id or store.latest_run() or "adhoc"
     briefs = store.briefs(run_id=run_id) or store.briefs(limit=int(cfg.get("brief.count", 8)))
@@ -873,6 +880,20 @@ def build(cfg: Config, store: Store, run_id: str | None = None,
     generated = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     env = Environment(autoescape=True)
+
+    def T(text):
+        """Content in both languages; Chinese falls back to the original."""
+        if not text:
+            return ""
+        zh = tr(text) or text
+        return Markup('<span data-en="{0}" data-zh="{1}">{2}</span>').format(
+            text, zh, zh if lang == "zh" else text)
+
+    def TT(title, key):
+        # Repo names are names; headlines and paper titles are prose.
+        return title if str(key or "").startswith("gh:") else T(title)
+
+    env.globals.update(T=T, TT=TT, tr=tr)
     html = env.from_string(TEMPLATE.replace("__CSS__", CSS)).render(
         generated=generated, run_id=run_id, briefs=briefs, past=past, rows=rows,
         dives=dives, api=api_token, tracks=tracks, run_no=run_no,
@@ -882,6 +903,8 @@ def build(cfg: Config, store: Store, run_id: str | None = None,
         stats=stats, summary=(briefs[0].get("board_summary") if briefs else ""),
         highlights=highlights, mix=mix,
     )
+    if record is not None:
+        return None, None
     if api_token:
         # Never overwrite index.html with a page carrying the local API token:
         # index.html is what `radar publish` ships.
@@ -892,7 +915,8 @@ def build(cfg: Config, store: Store, run_id: str | None = None,
     html_path.write_text(html, encoding="utf-8")
 
     md_path = cfg.out_dir / f"digest-{datetime.now():%Y-%m-%d}.md"
-    md_path.write_text(_markdown(briefs, rows, generated, highlights, mix, lang),
+    md_path.write_text(_markdown(briefs, rows, generated, highlights, mix, lang,
+                                 (lambda t: (tr(t) or t) if t else t) if lang == "zh" else None),
                        encoding="utf-8")
     return html_path, md_path
 
@@ -915,8 +939,9 @@ MD = {
 
 def _markdown(briefs: list[dict], rows: list[dict], generated: str,
               highlights: list[dict] | None = None, mix: dict | None = None,
-              lang: str = "en") -> str:
+              lang: str = "en", tr=None) -> str:
     W = MD.get(lang, MD["en"])
+    t = tr or (lambda x: x)
     L = [f"# {W['digest']} - {generated}", ""]
     if mix:
         L += [f"`{mix['new']} {W['new']}` · `{mix['infra']} {W['infra']}` · "
@@ -926,31 +951,33 @@ def _markdown(briefs: list[dict], rows: list[dict], generated: str,
         for lane in highlights:
             L += [f"### {lane['title'][lang]}", f"*{lane['note'][lang]}*", ""]
             for it in lane["items"]:
-                L.append(f"- **[{it['title'].replace('|', chr(92) + '|')}]({it['url']})** "
+                # Repo names stay; paper and headline titles are translated.
+                title = it["title"] if str(it.get("key", "")).startswith("gh:") else t(it["title"])
+                L.append(f"- **[{title.replace('|', chr(92) + '|')}]({it['url']})** "
                          f"`{it['score']:.2f}` — {it['reason'][lang]}")
                 if it["summary"]:
-                    L.append(f"  <br>{it['summary'][:150]}")
+                    L.append(f"  <br>{t(it['summary'][:150])}")
             L.append("")
         L += ["</details>", "", "---", ""]
     if briefs and briefs[0].get("board_summary"):
-        L += ["> " + briefs[0]["board_summary"], ""]
+        L += ["> " + t(briefs[0]["board_summary"]), ""]
     if briefs:
         L += [f"## {W['briefs']}", ""]
         for i, b in enumerate(briefs, 1):
             weeks = (f"约 {b['effort_weeks']} 周" if lang == "zh"
                      else f"~{b['effort_weeks']} weeks")
             L += [
-                f"### {i}. {b['title']}",
-                f"*{b['one_liner']}*", "",
+                f"### {i}. {t(b['title'])}",
+                f"*{t(b['one_liner'])}*", "",
                 f"`{W['difficulty']} {b['difficulty']}/5`  `{W['novelty']} {b['novelty']}/5`  "
                 f"`{weeks}`", "",
-                b["pitch"], "",
-                f"**{W['why_now']}** {b['why_now']}", "",
-                f"**{W['hard']}**", *[f"- {h}" for h in b["hard_parts"]], "",
-                f"**{W['learn']}**", *[f"- {h}" for h in b["you_will_learn"]], "",
-                f"**{W['milestones']}**", *[f"- {m}" for m in b["milestones"]], "",
-                f"**{W['prior']}**", *[f"- {p}" for p in b["prior_art"]], "",
-                f"**{W['kill']}** {b['kill_criteria']}", "",
+                t(b["pitch"]), "",
+                f"**{W['why_now']}** {t(b['why_now'])}", "",
+                f"**{W['hard']}**", *[f"- {t(h)}" for h in b["hard_parts"]], "",
+                f"**{W['learn']}**", *[f"- {t(h)}" for h in b["you_will_learn"]], "",
+                f"**{W['milestones']}**", *[f"- {t(m)}" for m in b["milestones"]], "",
+                f"**{W['prior']}**", *[f"- {t(p)}" for p in b["prior_art"]], "",
+                f"**{W['kill']}** {t(b['kill_criteria'])}", "",
                 f"**{W['sources']}**", *[f"- {u}" for u in b["source_urls"]], "", "---", "",
             ]
     # Group the digest by theme -- reads far better than a flat 60-row table.
@@ -967,7 +994,7 @@ def _markdown(briefs: list[dict], rows: list[dict], generated: str,
     for theme, group in sorted(by_theme.items(), key=order):
         L += [f"### {themes.label(theme, lang)}  ({len(group)})", ""]
         for r in group:
-            title = r["title"].replace("|", "\\|")
+            title = (r["title"] if r["key"].startswith("gh:") else t(r["title"])).replace("|", "\\|")
             L.append(f"- **{r['score']:.2f}** [{title}]({r['url']}) — {r['why'][lang]}")
         L.append("")
     return "\n".join(L) + "\n"

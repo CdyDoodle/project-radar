@@ -211,6 +211,8 @@ def cmd_run(args) -> int:
             console.print(f"[yellow]skipping Claude passes:[/] {exc}")
 
     store.finish_run(run_id, stats)
+    if not args.no_llm and cfg.get("translate.enabled", True):
+        _translate(cfg, store)
     html, md = report.build(cfg, store, run_id=run_id, feed_limit=args.limit)
     console.print(f"\n[green]report[/]  {html}")
     if not args.no_open:
@@ -310,6 +312,8 @@ def cmd_dive(args) -> int:
     console.print(f"  [dim]kill if:[/] {x['kill_threshold']}")
     console.print(f"\n[green]stored[/] {rep['_id']}  ({rep['links_checked']} links checked, "
                   f"{rep['links_unverified']} failed)")
+    if cfg.get("translate.enabled", True):
+        _translate(cfg, store)
     return 0
 
 
@@ -455,6 +459,33 @@ def cmd_track(args) -> int:
         console.print(f"  [bold]{t['name']}[/]  {len(t['hits'])} hits"
                       + (f", [green]{new} new this run[/]" if new else "")
                       + f"  [dim]{', '.join(t['keywords'][:5])}[/]")
+    return 0
+
+
+def _translate(cfg, store) -> None:
+    from radar import ideate, translate as tl
+    try:
+        with console.status("translating new content into Chinese..."):
+            st = tl.translate_missing(cfg, store)
+        if st["needed"]:
+            console.print(f"[green]translate[/] {st['translated']} of {st['needed']} new strings"
+                          + (f" ({st['failed']} left in English)" if st["failed"] else ""))
+    except (SystemExit, ideate.ClaudeCodeError) as exc:
+        console.print(f"[yellow]skipping translation:[/] {exc}")
+
+
+def cmd_translate(args) -> int:
+    from radar import translate as tl
+    cfg, store = _open(config.load(args.home))
+    todo = tl.missing(cfg, store)
+    have = len(store.translations(tl.LANG))
+    console.print(f"{have} strings already translated, {len(todo)} to do")
+    if args.dry_run or not todo:
+        for t in todo[:10]:
+            console.print(f"  [dim]{t[:100]}[/]")
+        return 0
+    _translate(cfg, store)
+    report.build(cfg, store)
     return 0
 
 
@@ -716,6 +747,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--keywords", help="comma-separated search phrases")
     s.add_argument("-n", "--limit", type=int, default=30)
     s.set_defaults(fn=cmd_track)
+
+    s = sub.add_parser("translate", help="translate page content into Simplified Chinese")
+    s.add_argument("--dry-run", action="store_true", help="count and list, translate nothing")
+    s.set_defaults(fn=cmd_translate)
 
     s = sub.add_parser("prune", help="delete items no recent run has seen")
     s.add_argument("--dry-run", action="store_true")

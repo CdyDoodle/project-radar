@@ -70,6 +70,12 @@ class App:
                 if not brief:
                     raise ValueError(f"no brief {brief_id}")
                 dv.dive(self.cfg, store, brief)
+                if self.cfg.get("translate.enabled", True):
+                    from radar import translate as tl
+                    try:
+                        tl.translate_missing(self.cfg, store)
+                    except BaseException as exc:      # the dive itself succeeded
+                        log.warning("translating the dive failed: %s", exc)
                 job["state"] = "done"
             except BaseException as exc:          # SystemExit from require_login too
                 job["state"], job["error"] = "failed", str(exc)[:300]

@@ -174,9 +174,19 @@ it works opened from disk with no server:
 | theme toggle | light / dark / follow system |
 
 Every interface string is rendered in both languages and swapped on the client,
-so the toggle needs no rebuild. Item titles and descriptions are never
-translated; they stay as their authors wrote them. Setting `brief.language`
-too makes the briefs themselves Chinese.
+so the toggle needs no rebuild. The page opens in Chinese by default
+(`report.language = "zh-CN"`).
+
+The content is translated too: item descriptions, paper and headline titles,
+briefs, dives, the board summary and track hits. `radar run` (and each dive)
+renders the page once in a recording mode to collect exactly the strings it
+will show, translates the new ones through Claude Code in batches, and stores
+them by a hash of the source text, so each string is translated once and later
+runs only send what is new. Repo names, URLs, code and standard technical terms
+stay as written. The English is kept, so the toggle switches content as well,
+and anything not yet translated falls back to English. `radar translate` does
+the same by hand; `--dry-run` counts what is left. Search works in both
+languages.
 
 The page is static, so save and dismiss can't write to the database; the
 buttons copy the command to run. "Worth a look" also has a **Saved** lane, and
@@ -334,8 +344,10 @@ which briefs have been checked.
 ## After you pick a project
 
 ```bash
-.adar.cmd track add "code-map benchmark" --from-brief 8
-.adar.cmd track
+.
+adar.cmd track add "code-map benchmark" --from-brief 8
+.
+adar.cmd track
 ```
 
 Choosing is not the end of radar's job. On a year-long project the risk that
@@ -444,6 +456,7 @@ radar tune      learn ranking weights from your saves and dismissals (--apply)
 radar gaps      papers checked to have no implementation
 radar watch     the watchlist: --suggest people, --add them
 radar track     watch a chosen project's space: add, list, show, check, stop
+radar translate translate page content into Simplified Chinese (--dry-run)
 radar prune     delete items no recent run has seen (--dry-run to count)
 radar hydrate   backfill GitHub metadata for repos stored without it
 radar publish   build the report and push it to GitHub Pages

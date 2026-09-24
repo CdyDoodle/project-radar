@@ -313,10 +313,21 @@ timeout_seconds = 2400
 search_github = true
 search_arxiv = true
 
+[translate]
+# Content in Simplified Chinese: item descriptions, paper and headline titles,
+# briefs, dives and track hits, translated through Claude Code during
+# `radar run` (and after each dive). Each string is translated once and
+# stored; later runs only send what is new. English is kept, and the page's
+# language toggle switches content too.
+enabled = true
+effort = "low"
+per_call = 80
+max_workers = 3
+
 [report]
 # Default language of the dashboard and digest: "en" or "zh-CN". The page has
 # a toggle either way; this only picks what it shows first.
-language = "en"
+language = "zh-CN"
 
 [storage]
 db = "radar.db"

@@ -45,6 +45,11 @@ model = "claude-opus-5"
 cards = 3
 count = 2
 
+[translate]
+# Tests never call the real Claude Code CLI; translation tests enable it
+# explicitly with a fake one.
+enabled = false
+
 [storage]
 db = "radar.db"
 out_dir = "out"
