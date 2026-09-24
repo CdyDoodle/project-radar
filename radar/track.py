@@ -6,7 +6,7 @@ changes the approach, and finding out three months late. A track is a named
 set of search phrases (by default the `search_terms` a dive produced), and
 every run checks three places for anything new:
 
-1. the corpus: items matching two or more phrases, or one in the title;
+1. the corpus: items matching two phrases, or every meaningful word of one;
 2. GitHub: repos *created after the track started* matching a phrase;
 3. arXiv: papers submitted after the track started matching a phrase.
 
