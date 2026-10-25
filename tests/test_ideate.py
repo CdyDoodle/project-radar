@@ -215,6 +215,20 @@ def test_finds_the_desktop_apps_packaged_copy(tmp_path, monkeypatch, cfg):
     assert ideate.find_claude(cfg).endswith("2.1.280" + __import__("os").sep + "claude.exe")
 
 
+def test_finds_the_newer_layout_with_a_build_hash_folder(tmp_path, monkeypatch, cfg):
+    # Since October 2026: claude-code/<version>/<build hash>/claude.exe
+    root = tmp_path / "Roaming" / "Claude" / "claude-code"
+    for ver, build in (("2.1.286", "635c1867224a"), ("2.1.295", "d2e29494ec83")):
+        exe = root / ver / build / "claude.exe"
+        exe.parent.mkdir(parents=True)
+        exe.write_bytes(b"")
+    monkeypatch.setenv("APPDATA", str(tmp_path / "Roaming"))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "Local-empty"))
+    monkeypatch.setattr(ideate.shutil, "which", lambda name: None)
+    found = ideate.find_claude(cfg)
+    assert "2.1.295" in found and found.endswith("claude.exe")
+
+
 def test_api_key_is_withheld(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
     monkeypatch.setenv("CLAUDECODE", "1")

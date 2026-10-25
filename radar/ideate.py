@@ -97,20 +97,26 @@ def find_claude(cfg: Config) -> str | None:
         return on_path
     bundled = bundled_claude_paths()
     if bundled:
-        def version(path: str) -> tuple:
-            name = Path(path).parent.name
-            return tuple(int(p) if p.isdigit() else 0 for p in name.split("."))
-        return max(bundled, key=version)
+        return max(bundled, key=lambda pv: pv[1])[0]
     return None
 
 
-def bundled_claude_paths() -> list[str]:
-    """Copies of claude.exe that ship with the Claude desktop app on Windows.
+def _version(name: str) -> tuple:
+    return tuple(int(p) if p.isdigit() else 0 for p in name.split("."))
+
+
+def bundled_claude_paths() -> list[tuple[str, tuple]]:
+    """Copies of claude.exe that ship with the Claude desktop app on Windows,
+    each with its version.
 
     The Store/MSIX build redirects the app's %APPDATA% into its package
     folder. Only the app's own processes see the redirected path; a normal
     terminal must look inside LocalAppData\\Packages\\Claude_*\\LocalCache.
     Both places are searched so radar works from either.
+
+    Two layouts exist: claude-code/<version>/claude.exe, and since October
+    2026 claude-code/<version>/<build hash>/claude.exe. The version is always
+    the folder directly under claude-code.
     """
     roots = []
     if os.environ.get("APPDATA"):
@@ -120,8 +126,11 @@ def bundled_claude_paths() -> list[str]:
                                         "LocalCache", "Roaming", "Claude", "claude-code"))
     found = []
     for root in roots:
-        found += [p for p in glob.glob(os.path.join(root, "*", "claude.exe"))
-                  if os.path.isfile(p)]
+        for pattern in (("*", "claude.exe"), ("*", "*", "claude.exe")):
+            for p in glob.glob(os.path.join(root, *pattern)):
+                if os.path.isfile(p):
+                    version = Path(p).relative_to(root).parts[0]
+                    found.append((p, _version(version)))
     return found
 
 
