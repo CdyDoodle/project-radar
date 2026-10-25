@@ -30,6 +30,47 @@ from __future__ import annotations
 import re
 
 THEME_PATTERNS: dict[str, str] = {
+    # AI products: the kinds of thing an independent developer ships. These
+    # sit first in PRIORITY, ahead of the generic ai-agents bucket that
+    # nearly everything built this year falls into.
+    "ai-security":   r"prompt.injection|(?<!no )jailbreak|red.?team|guardrail|"
+                     r"\b(ai|llm|agent|model|mcp)[ -](security|safety)\b|"
+                     r"security (scanner|audit)s? (for|of) .{0,30}(ai|agent|llm|mcp|model)|"
+                     r"interpretability|\balignment (research|tax|faking)|"
+                     r"adversarial.(attack|prompt|example)",
+    # Skills, plugins and packs that extend an agent: the most common thing a
+    # solo developer publishes right now, and none of the older themes saw it.
+    "agent-skills":  r"\b(agent|claude|codex|ai)[ -]skills?\b|\bskills?[ -]pack\b|"
+                     r"\bskills? (that|for|to)\b|\bdsh[ -]plugin\b|"
+                     r"(agent|claude code|codex|harness) plugins?\b|\bclaude[ -]md\b",
+    # NOT the bare `claude-code`, `codex` or `vibe-coding` topics: people tag
+    # anything they built *with* those that way -- a TV debloater, a Kindle
+    # dashboard.
+    "coding-agents": r"coding[ -](agent|assistant|cli)s?|\bclaude code\b|codex cli|"
+                     r"openai codex|gemini cli|\bopencode\b|\baider\b|copilot|"
+                     r"pair programmer|ai[ -]cod(e|ing)\b|"
+                     r"(ai|agent|coding|deepseek) harness|harness desktop|"
+                     r"agent coding|cursor (ide|rules|agent)",
+    "mcp":           r"\bmcp\b|model context protocol",
+    "computer-use":  r"computer.?use|browser.(automation|agent|use)\b|gui.agent|"
+                     r"phone.agent|(control|operate|drive)s? (a |your |any )?"
+                     r"(real )?(computer|desktop|browser|phone|iphone|android)",
+    "voice-audio":   r"text.to.speech|\btts\b|speech.to.text|\bstt\b|\basr\b|"
+                     r"speech.(recognition|synthesis)|voice.(clon|agent|assistant|mode|chat|ai)|"
+                     r"\bwhisper\b|transcri(be|ption)|real.?time voice",
+    "ai-media":      r"image.generation|video.generation|text.to.(image|video)|"
+                     r"image.to.video|stable.diffusion|\bcomfyui\b|\bflux\b|"
+                     r"(ai|generative).(image|video|art)|(image|video).gen(erator)?s?\b|"
+                     r"logo generator|illustration|生图|配图",
+    "self-hosted":   r"self.?host|local.?first|open.?source alternative|"
+                     r"alternative to|privacy.?first|runs? (entirely )?offline",
+    # Plain AI products: an app with a model inside. Last of the AI themes, so
+    # it only files what nothing more specific claimed.
+    "ai-apps":       r"\b(with|using|powered by|built with|on) (ai|llms?|gpt|claude|llama|"
+                     r"gemini|deepseek|qwen|open (source )?(models?|llms?))\b|"
+                     r"\bai[ -](search|tutor|assistant|writer|generator|chat|app|reader|"
+                     r"dashboard|companion|notes?|usage)\b|chat with (your )?|"
+                     r"\b(llm|ai)[ -]powered\b",
     # Deliberately NOT a bare "llm" -- that matches everything built this year.
     "llm-inference": r"\bgguf\b|\bggml\b|\bmoe\b|mixture.of.experts|kv.?cache|"
                      r"llama\.cpp|\bvllm\b|\bollama\b|\bllamafile\b|token/s|"
@@ -237,12 +278,16 @@ UNCLASSIFIED = "other"
 #
 # gpu-hpc precedes os-kernel deliberately: a GPU "kernel" is not an OS kernel.
 PRIORITY = [
+    # What the thing does first; then the generic agent-extension buckets, so
+    # a computer-use agent tagged `agent-skills` still files as computer use.
+    "ai-security", "computer-use", "voice-audio", "ai-media",
+    "agent-skills", "coding-agents", "mcp",
     "llm-inference", "emulation", "compilers-pl", "gpu-hpc", "os-kernel",
     "embedded-hw", "robotics", "virtualization", "databases", "distributed",
     "concurrency", "wasm", "security", "networking", "observability",
     "version-control", "science-compute", "theory", "data-eng",
     "graphics-media", "ui-desktop", "ml-research", "web", "devtools",
-    "ai-agents", "industry", DISCUSSION,
+    "self-hosted", "ai-apps", "ai-agents", "industry", DISCUSSION,
 ]
 
 
@@ -259,6 +304,10 @@ def primary(theme_set: set[str]) -> str:
 # Display labels. The identifiers above stay English everywhere in the data;
 # only the dashboard and digest show these.
 LABELS_ZH = {
+    "ai-security": "AI 安全", "coding-agents": "编程 Agent", "mcp": "MCP 与工具接入",
+    "computer-use": "电脑与浏览器操控", "voice-audio": "语音", "ai-media": "AI 图像与视频",
+    "self-hosted": "自托管与本地优先",
+    "agent-skills": "Agent 技能与插件", "ai-apps": "AI 应用产品",
     "llm-inference": "LLM 推理", "ai-agents": "AI 智能体", "ml-research": "机器学习研究",
     "compilers-pl": "编译器与语言", "databases": "数据库", "distributed": "分布式系统",
     "concurrency": "并发", "os-kernel": "操作系统内核", "embedded-hw": "嵌入式与硬件",

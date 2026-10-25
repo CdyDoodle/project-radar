@@ -94,11 +94,14 @@ __CSS__
   <div class="section-head"><div>
     <div class="eyebrow" data-en="Everything, ranked" data-zh="全部条目 · 已排名"></div>
     <h2 data-en="Ranked signal" data-zh="排名信号"></h2>
-    <p data-en="Curated order is redundancy-filtered, so near-identical projects don't stack; sort by score for the raw ranking. Hover a row to save or dismiss it."
-       data-zh="“精选”顺序做过去重，几乎相同的项目不会堆在一起；按分数排序可查看原始排名。鼠标悬停在条目上可以保存或忽略。"></p>
+    <p data-en="Jump straight to solo-built AI work, the topics you follow or what is new this run. Curated order keeps near-identical projects from stacking; the score breakdown sits under each reason."
+       data-zh="一键切到个人 AI 作品、你关注的主题或本次新增。“精选”顺序做过去重，相似项目不会堆在一起；每条理由下面是分数构成。"></p>
   </div></div>
 
   <div class="toolbar">
+    <div class="quick" id="quick" role="tablist">
+      {% for v in quick %}<button data-quick="{{ v.key }}" role="tab"{% if not v.key %} class="on"{% endif %}><span data-en="{{ v.en }}" data-zh="{{ v.zh }}"></span><i>{{ v.n }}</i></button>{% endfor %}
+    </div>
     <div class="tb-row">
       <div class="search"><input type="search" id="q" data-en-placeholder="Search names, descriptions, topics…   /" data-zh-placeholder="搜索名称、描述、主题…   /"></div>
       <select id="sort" aria-label="sort">
@@ -144,7 +147,7 @@ __CSS__
       data-sources="{{ r.sources|join(' ') }}"
       data-themes="{{ r.themes|join(' ') }}"
       data-primary="{{ r.primary }}" data-axis="{{ r.axis }}"
-      data-lang="{{ r.lang or '' }}"
+      data-lang="{{ r.lang or '' }}" data-quick="{{ r.quick }}"
       data-score="{{ r.score }}" data-vel="{{ r.velocity }}"
       data-age="{{ r.age_days }}" data-stars="{{ r.stars }}"
       data-curated="{{ loop.index0 }}">
@@ -153,6 +156,7 @@ __CSS__
     <td>
       <a href="{{ r.url }}" class="item-title">{{ TT(r.title, r.key) }}</a>
       <span class="acts"><button class="act" data-cmd="save" data-en="save" data-zh="保存"></button><button class="act" data-cmd="dismiss" data-en="dismiss" data-zh="忽略"></button>{% if api %}<button class="act" data-cmd="note" data-en="note" data-zh="备注"></button>{% endif %}</span>
+      {% if r.badges %}<span class="badges">{% for b in r.badges %}<span class="bdg {{ b.cls }}" data-en="{{ b.en }}" data-zh="{{ b.zh }}"></span>{% endfor %}</span>{% endif %}
       <span class="desc">{{ T(r.summary[:190]) }}</span>
       {% if r.status == 'saved' %}<span class="tag sv" data-en="saved" data-zh="已保存"></span>{% endif %}
       {% if r.note %}<span class="note">{{ r.note }}</span>{% endif %}
@@ -161,7 +165,8 @@ __CSS__
       {% for t in r.theme_labels %}<span class="tag th" data-en="{{ t.en }}" data-zh="{{ t.zh }}"></span>{% endfor %}
       {% for s in r.sources %}<span class="tag">{{ s }}</span>{% endfor %}
     </td>
-    <td class="why"><span data-en="{{ r.why.en }}" data-zh="{{ r.why.zh }}"></span><br><span data-en="{{ r.metrics_line.en }}" data-zh="{{ r.metrics_line.zh }}"></span></td>
+    <td class="why"><span class="reason" data-en="{{ r.reason.en }}" data-zh="{{ r.reason.zh }}"></span>
+      <span class="score-why" data-en="{{ r.why.en }}" data-zh="{{ r.why.zh }}"></span></td>
   </tr>
   {% endfor %}
   </tbody></table>
@@ -218,7 +223,7 @@ const T={
       items:n=>n+' 条', hidden:'（已折叠）', collapse:'全部折叠', expand:'全部展开',
       copied:'已复制', toggle:'EN'},
 };
-const state={src:'', themes:new Set(), axes:new Set(), group:true, collapsed:new Set(),
+const state={src:'', quick:'', themes:new Set(), axes:new Set(), group:true, collapsed:new Set(),
              lang:{{ lang|tojson }}};
 
 try{ const s=JSON.parse(localStorage.getItem('radar-prefs')||'{}');
@@ -227,10 +232,11 @@ try{ const s=JSON.parse(localStorage.getItem('radar-prefs')||'{}');
   if(s.ui==='en'||s.ui==='zh') state.lang=s.ui;
   if(s.group!==undefined) state.group=!!s.group;
   if(Array.isArray(s.collapsed)) state.collapsed=new Set(s.collapsed);
+  if(typeof s.quick==='string' && document.querySelector(`[data-quick="${CSS.escape(s.quick)}"]`)) state.quick=s.quick;
 }catch(e){}
 function save(){ try{ localStorage.setItem('radar-prefs', JSON.stringify({
   show:showSel.value, sort:sortSel.value, lang:langSel.value, group:state.group,
-  ui:state.lang, collapsed:[...state.collapsed]}));
+  ui:state.lang, collapsed:[...state.collapsed], quick:state.quick}));
 }catch(e){} }
 
 // ---- language ----
@@ -272,6 +278,7 @@ const CMP={
 function matches(r){
   const t=q.value.toLowerCase().trim();
   if(t && !r.dataset.text.includes(t)) return false;
+  if(state.quick && !r.dataset.quick.split(' ').includes(state.quick)) return false;
   if(state.src && !r.dataset.sources.split(' ').includes(state.src)) return false;
   if(langSel.value && r.dataset.lang!==langSel.value) return false;
   if(state.axes.size && !state.axes.has(r.dataset.axis)) return false;
@@ -326,6 +333,8 @@ function render(){
   collapseBtn.hidden = !state.group;
   collapseBtn.textContent = groupNames.some(n=>state.collapsed.has(n)) ? L.expand : L.collapse;
   const n=activeFilters(), badge=$('#filter-n'); badge.hidden=!n; badge.textContent=n;
+  $$('#quick button').forEach(b=>{ const on=b.dataset.quick===state.quick;
+    b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
   save();
 }
 $('#filter-btn').addEventListener('click',()=>{ $('#filters').classList.toggle('open');
@@ -338,6 +347,7 @@ collapseBtn.addEventListener('click',()=>{
   if(names.some(n=>state.collapsed.has(n))) names.forEach(n=>state.collapsed.delete(n));
   else names.forEach(n=>state.collapsed.add(n));
   render();});
+$$('#quick button').forEach(b=>b.addEventListener('click',()=>{ state.quick=b.dataset.quick; render(); }));
 $$('button[data-src]').forEach(b=>b.addEventListener('click',()=>{
   const v=b.dataset.src, on=state.src===v;
   $$('button[data-src]').forEach(x=>x.classList.remove('on'));
@@ -351,7 +361,7 @@ $$('button[data-theme]').forEach(b=>b.addEventListener('click',()=>{
   if(state.themes.has(v)){state.themes.delete(v); b.classList.remove('on');} else {state.themes.add(v); b.classList.add('on');}
   render();}));
 $('#reset').addEventListener('click',()=>{
-  q.value=''; langSel.value=''; state.src=''; state.themes.clear(); state.axes.clear();
+  q.value=''; langSel.value=''; state.src=''; state.quick=''; state.themes.clear(); state.axes.clear();
   $$('.chipset button').forEach(x=>x.classList.remove('on')); render();});
 document.addEventListener('keydown',e=>{
   if(e.key==='/' && document.activeElement!==q){

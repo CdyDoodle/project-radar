@@ -257,12 +257,43 @@ def _on_topic(item, topic: dict) -> bool:
     return not topic["ai_only"] or axis.of_item(item) != axis.NON_AI
 
 
-def _rows(store: Store, cfg: Config, limit: int) -> list[dict]:
+def _badges(item, is_new: bool, on_topics: list[dict]) -> list[dict]:
+    """Short labels for the signal column: why to look, before the numbers."""
+    out = []
+    if is_new:
+        out.append({**_both("new", "新"), "cls": "new"})
+    if item.metrics.get("show_hn"):
+        out.append({**_both("Show HN", "Show HN"), "cls": "indie"})
+    elif rank.indie(item):
+        out.append({**_both("solo-built", "个人作品"), "cls": "indie"})
+    for t in on_topics:
+        out.append({**t["title"], "cls": "topic"})
+    if item.metrics.get("starred_by") or item.metrics.get("worked_on_by"):
+        out.append({**_both("watchlist", "关注列表"), "cls": "watch"})
+    return out
+
+
+def _quick_views(rows: list[dict], cfg: Config) -> list[dict]:
+    """One-click slices of the feed along the lines the profile cares about.
+    Empty slices are left out; "all" always comes first."""
+    views = [("indie", _both("Solo-built AI", "个人 AI 作品"))]
+    views += [(f"topic:{t['key']}", t["title"]) for t in _topic_lanes(cfg)]
+    views += [("new", _both("New this run", "本次新增")), ("saved", _both("Saved", "已保存"))]
+    out = [{"key": "", **_both("All", "全部"), "n": len(rows)}]
+    for key, title in views:
+        n = sum(1 for r in rows if key in r["quick"].split())
+        if n:
+            out.append({"key": key, **title, "n": n})
+    return out
+
+
+def _rows(store: Store, cfg: Config, limit: int, since: str | None = None) -> list[dict]:
     """Feed rows in curated (redundancy-filtered) order.
 
     The client can re-sort by raw score, so curated order is emitted as a
     position index rather than being the only thing available.
     """
+    topics = _topic_lanes(cfg)
     ranked = store.items(limit=max(limit * 2, limit + 60))
     ordered = diversify.diversified(store, ranked, cfg, limit)
 
@@ -276,6 +307,8 @@ def _rows(store: Store, cfg: Config, limit: int) -> list[dict]:
         if item.created_at:
             age = (now() - item.created_at).total_seconds() / 86400
         ax = axis.of_item(item)
+        is_new = bool(since and (row["first_seen"] or "") >= since)
+        on_topics = [t for t in topics if _on_topic(item, t)]
         out.append({
             "key": item.key, "status": row["status"], "note": row["note"] or "",
             "score": row["score"], "title": item.title, "url": item.url,
@@ -288,6 +321,14 @@ def _rows(store: Store, cfg: Config, limit: int) -> list[dict]:
             "axis_label": _both(axis.label(ax), axis.label(ax, "zh")),
             "why": _both(explain(breakdown), explain(breakdown, "zh")),
             "metrics_line": _metrics_line({**item.metrics, **breakdown.get("signals", {})}),
+            "reason": _reason(item, sorted(item.sources), False, breakdown.get("signals", {})),
+            "badges": _badges(item, is_new, on_topics),
+            # Most trending repos sit under a personal account, so the quick
+            # view narrows to solo-built AI work, as the Overview lane does.
+            "quick": " ".join(["indie"] * bool(rank.indie(item) and ax != axis.NON_AI)
+                              + ["new"] * is_new
+                              + [f"topic:{t['key']}" for t in on_topics]
+                              + ["saved"] * (row["status"] == "saved")),
             "velocity": round(breakdown.get("components", {}).get("velocity", 0), 4),
             "age_days": round(age, 1) if age is not None else 99999,
             "stars": int(item.metrics.get("stars") or 0),
@@ -316,8 +357,8 @@ def build(cfg: Config, store: Store, run_id: str | None = None,
     for t in tk.tracks(store):
         t["new"] = tk.new_hits(t, run_no)
         tracks.append(t)
-    rows = _rows(store, cfg, feed_limit)
     since = store.run_started(run_id)
+    rows = _rows(store, cfg, feed_limit, since)
     highlights = _highlights(store, cfg, since)
     counts_axis = Counter(r["axis"] for r in rows)
     mix = {
@@ -332,6 +373,7 @@ def build(cfg: Config, store: Store, run_id: str | None = None,
     theme_ids = sorted({t for r in rows for t in r["themes"]})
     theme_names = [{"id": t, "en": t, "zh": themes.label(t, "zh")} for t in theme_ids]
     languages = sorted({r["lang"] for r in rows if r["lang"]})
+    quick = _quick_views(rows, cfg)
     counts = store.counts()
     # "Tracked" is what recent runs still see; forgotten items are not in play.
     stats = {"total": len(store.items(include_dismissed=True)),
@@ -359,7 +401,7 @@ def build(cfg: Config, store: Store, run_id: str | None = None,
         source_names=source_names, theme_names=theme_names, languages=languages,
         theme_labels=themes.LABELS_ZH, lang=lang,
         axes=[{"id": a, "en": axis.label(a), "zh": axis.label(a, "zh")} for a in axis.ALL_AXES],
-        stats=stats, highlights=highlights, mix=mix,
+        stats=stats, highlights=highlights, mix=mix, quick=quick,
     )
     if record is not None:
         return None, None

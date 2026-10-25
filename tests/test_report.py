@@ -92,3 +92,24 @@ def test_topic_lane_from_config(store, cfg):
     assert lane["title"] == {"en": "AI security", "zh": "AI 安全"}
     page = report.build(cfg, store, run_id="r1")[0].read_text(encoding="utf-8")
     assert 'data-zh="AI 安全"' in page
+
+
+def test_feed_quick_views_and_badges(store, cfg):
+    cfg.raw["report"] = {"topic_lanes": [{"key": "ai-security", "en": "AI security",
+                                          "zh": "AI 安全", "terms": ["prompt injection"]}]}
+    store.start_run("r1")
+    with store.tx():
+        store.upsert(repo("alice/shield", "Stops prompt injection in LLM agents",
+                          owner_type="User", stars=300))
+        store.upsert(repo("bigco/db", "A columnar database engine",
+                          owner_type="Organization", stars=300))
+    rank.rank_all(store, cfg)
+    rows = {r["key"]: r for r in report._rows(store, cfg, 50, since="2000")}
+    shield = rows["gh:alice/shield"]
+    assert set(shield["quick"].split()) == {"indie", "new", "topic:ai-security"}
+    assert [b["zh"] for b in shield["badges"]] == ["新", "个人作品", "AI 安全"]
+    assert "indie" not in rows["gh:bigco/db"]["quick"]
+    views = {v["key"]: v["n"] for v in report._quick_views(list(rows.values()), cfg)}
+    assert views == {"": 2, "indie": 1, "topic:ai-security": 1, "new": 2}   # no saved: left out
+    page = report.build(cfg, store, run_id="r1")[0].read_text(encoding="utf-8")
+    assert 'data-quick="indie"' in page and 'class="bdg indie"' in page

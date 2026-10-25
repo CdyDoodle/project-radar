@@ -35,7 +35,19 @@ PRIMARY = [
      "observability"),
     ("x/jj", "A Git-compatible version control system", [], "version-control"),
     ("x/quic-rs", "QUIC protocol implementation", [], "networking"),
-    ("x/mcp-gdb", "MCP server that lets Claude drive gdb", ["mcp-server"], "ai-agents"),
+    ("x/mcp-gdb", "MCP server that lets Claude drive gdb", ["mcp-server"], "mcp"),
+    # AI product themes. Topics name how a thing was built as often as what
+    # it is: `claude-code` and `vibe-coding` on a TV debloater mean "made with".
+    ("x/cleantv", "Debloat any Android TV over Wi-Fi", ["claude-code", "vibe-coding"], "other"),
+    ("x/shield", "Detect prompt injection before it reaches your agent", [], "ai-security"),
+    ("x/iphone-agent", "Let an AI model use a real iPhone, no jailbreak", ["ai-agent"],
+     "computer-use"),
+    ("x/muse", "A personal agent with your computer as its hands", ["agent-skills", "computer-use"],
+     "computer-use"),
+    ("x/skills", "Personal agent skills", ["agent-skills", "claude-skills"], "agent-skills"),
+    ("x/axuse", "Installs for every harness (Codex, Claude Code, OpenCode)", [], "coding-agents"),
+    ("x/studio", "Local voice cloning and text-to-speech studio", [], "voice-audio"),
+    ("x/pdfchat", "Chat with your PDFs with AI", [], "ai-apps"),
     # The README story: its README said "operating system".
     ("audacity/audacity", "Audio Editor", ["audio"], "graphics-media"),
     # googletest was once filed as industry news for the word "google".
