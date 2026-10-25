@@ -51,6 +51,8 @@ def _repo_item(repo: dict, source: str, evidence: str) -> Item | None:
         "days_since_push": round((now() - pushed).total_seconds() / 86400, 1) if pushed else None,
         "archived": bool(repo.get("archived")),
         "fork": bool(repo.get("fork")),
+        # "User" or "Organization": a person's repo is the solo-builder signal.
+        "owner_type": (repo.get("owner") or {}).get("type"),
     }
     return Item(
         key=f"gh:{full.lower()}",

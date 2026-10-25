@@ -69,3 +69,26 @@ def test_no_project_briefs_on_the_page(store, cfg):
     page = report.build(cfg, store, run_id="r1")[0].read_text(encoding="utf-8")
     assert "view-briefs" not in page and "项目简报" not in page
     assert 'data-zh="多来源印证"' in page
+
+
+def test_topic_lane_from_config(store, cfg):
+    cfg.raw["report"] = {"topic_lanes": [{
+        "key": "ai-security", "en": "AI security", "zh": "AI 安全",
+        "terms": ["prompt injection", "jailbreak", "security"]}]}
+    items = [
+        repo("a/shield", "Detects prompt injection against LLM agents", stars=300),
+        repo("b/ios", "iPhone jailbreak toolkit", stars=300),                # no AI
+        repo("c/chat", "An LLM chat app", stars=300),
+    ]
+    items[2].readme = "## Security\nReport issues by email."             # README only
+    store.start_run("r1")
+    with store.tx():
+        for it in items:
+            store.upsert(it)
+    rank.rank_all(store, cfg)
+    lanes = {l["key"]: l for l in report._highlights(store, cfg, since=None)}
+    lane = lanes["topic:ai-security"]
+    assert [i["title"] for i in lane["items"]] == ["a/shield"]
+    assert lane["title"] == {"en": "AI security", "zh": "AI 安全"}
+    page = report.build(cfg, store, run_id="r1")[0].read_text(encoding="utf-8")
+    assert 'data-zh="AI 安全"' in page

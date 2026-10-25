@@ -22,7 +22,7 @@ from pathlib import Path
 from jinja2 import Environment
 from markupsafe import Markup
 
-from radar import axis, diversify, themes
+from radar import axis, diversify, rank, themes
 from radar.config import Config
 from radar.models import now
 from radar.rank import explain
@@ -126,6 +126,9 @@ LANES = {
               _both("what you marked worth keeping", "你标记为值得保留的条目")),
     "new": (_both("New this run", "本次新增"),
             _both("highest-scoring things that were not here last time", "上次没有、这次得分最高的条目")),
+    "indie": (_both("Solo-built AI", "个人开发者的 AI 作品"),
+              _both("AI projects under a personal account, and Show HN launches: what one person can ship",
+                    "个人账号下的 AI 项目和 Show HN 发布：一个人能做出什么")),
     "fastest": (_both("Moving fastest", "增长最快"),
                 _both("star velocity against the rest of the corpus, famous repos excluded",
                       "相对整个语料库的星增速，不含已成名的仓库")),
@@ -181,6 +184,8 @@ def _highlights(store: Store, cfg: Config, since: str | None,
             "reason": _reason(item, p["sources"], p["is_new"], p["signals"]),
         }
 
+    topics = _topic_lanes(cfg)
+    titles = {**LANES, **{f"topic:{t['key']}": (t["title"], t["note"]) for t in topics}}
     used: set[str] = set()
 
     def take(candidates, n=per_lane):
@@ -198,7 +203,13 @@ def _highlights(store: Store, cfg: Config, since: str | None,
     by_score = sorted(prepared, key=lambda p: -p["row"]["score"])
     lanes = [
         ("saved", take([p for p in by_score if p["row"]["status"] == "saved"], n=6)),
+        # Subjects you chose to follow come before the generic lanes, which
+        # would otherwise claim their items first.
+        *[(f"topic:{t['key']}", take([p for p in by_score if _on_topic(p["item"], t)], n=6))
+          for t in topics],
         ("new", take([p for p in by_score if p["is_new"]])),
+        ("indie", take([p for p in by_score if not p["mega"] and rank.indie(p["item"])
+                        and axis.of_item(p["item"]) != axis.NON_AI], n=6)),
         # A 200k-star repo is the fastest thing on the page and the least
         # useful: you can't do frontier work where everyone already is.
         ("fastest", take(sorted(
@@ -219,8 +230,31 @@ def _highlights(store: Store, cfg: Config, since: str | None,
         lanes.append(("papers", take([p for p in checked if not p["item"].metrics.get("impl_count")])))
     else:
         lanes.append(("papers_unchecked", take(papers)))
-    return [{"key": k, "title": LANES[k][0], "note": LANES[k][1], "items": i}
+    return [{"key": k, "title": titles[k][0], "note": titles[k][1], "items": i}
             for k, i in lanes if i]
+
+
+def _topic_lanes(cfg: Config) -> list[dict]:
+    """Lanes for subjects you follow, from `[[report.topic_lanes]]` in config.toml."""
+    out = []
+    for t in cfg.get("report.topic_lanes", []) or []:
+        terms = [x.lower() for x in t.get("terms", []) if x.strip()]
+        if not (t.get("key") and terms):
+            continue
+        en, zh = t.get("en") or t["key"], t.get("zh") or t.get("en") or t["key"]
+        out.append({"key": t["key"], "terms": terms, "ai_only": bool(t.get("ai_only", True)),
+                    "title": _both(en, zh),
+                    "note": _both(t.get("note_en", ""), t.get("note_zh") or t.get("note_en", ""))})
+    return out
+
+
+def _on_topic(item, topic: dict) -> bool:
+    """Name, description and topics only: a README's boilerplate "Security"
+    section would put half the corpus in a security lane."""
+    text = " ".join([item.title or "", item.summary or "", " ".join(item.topics)]).lower()
+    if not any(rank.term_pattern(term).search(text) for term in topic["terms"]):
+        return False
+    return not topic["ai_only"] or axis.of_item(item) != axis.NON_AI
 
 
 def _rows(store: Store, cfg: Config, limit: int) -> list[dict]:

@@ -69,7 +69,7 @@ that collapse is itself a ranking signal.
 
 ## How ranking works
 
-Score is a weighted sum of six components in `[0,1]`, minus explicit penalties.
+Score is a weighted sum of seven components in `[0,1]`, minus explicit penalties.
 Every number is stored, so the dashboard and `radar show` can always tell you
 why something is where it is.
 
@@ -81,6 +81,7 @@ why something is where it is.
 | `fit` | weighted keyword match against `[interests]` |
 | `freshness` | exponential decay, 45-day half-life |
 | `depth` | language, topics, and systems vocabulary as a proxy for real engineering |
+| `indie` | built by one person: a repo under a personal account, or a Show HN launch |
 
 Penalties: `slop` (awesome-lists, tutorials, prompt collections), `chatter`
 (a blog post with no code behind it), `stale`, `archived`, `mega` (already
@@ -92,6 +93,10 @@ the stars gained between them instead of `stars / age`. The lifetime average
 hid an old repo that just took off and flattered one that peaked a year ago.
 Items growing at least twice their lifetime pace, at 5+ stars a day, get their
 own **Breaking out** lane.
+AI projects built by one person get a **Solo-built AI** lane of their own.
+Subjects you follow get lanes too: each `[[report.topic_lanes]]` entry in
+`config.toml` (the default one is **AI security & safety**) collects the
+highest-scoring AI items whose name, description or topics match its terms.
 
 `velocity` is a percentile against the live corpus, not a fixed ceiling. A fixed
 ceiling collapses: capping stars/day at 40 when real values run 39–658 pinned a

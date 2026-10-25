@@ -65,6 +65,7 @@ DEFAULT_WEIGHTS = {
     "fit": 1.6,
     "freshness": 0.7,
     "depth": 0.9,
+    "indie": 0.0,
 }
 DEFAULT_PENALTIES = {
     "slop": 2.5,
@@ -166,6 +167,17 @@ def watchlist(item: Item) -> float:
     people = set(item.metrics.get("starred_by") or []) | set(item.metrics.get("worked_on_by") or [])
     n = len(people)
     return 0.0 if n == 0 else 1 - 0.55 ** n
+
+
+def indie(item: Item) -> float:
+    """Built by one person: a repo under a personal account, or a Show HN post.
+
+    Company and foundation repos dominate the trending lists; for someone
+    working alone, what other people ship alone is the comparable work.
+    """
+    if item.metrics.get("show_hn"):
+        return 1.0
+    return 1.0 if item.metrics.get("owner_type") == "User" else 0.0
 
 
 @functools.lru_cache(maxsize=512)
@@ -297,6 +309,7 @@ def score_item(item: Item, cfg: Config, row=None,
         "fit": fit(item, cfg.interests),
         "freshness": freshness(item, half_life),
         "depth": depth(item),
+        "indie": indie(item),
     }
     pens = penalties(item, cfg, row)
 
@@ -371,7 +384,7 @@ def growth_signals(item: Item) -> dict:
 COMPONENT_LABELS = {
     "zh": {
         "velocity": "热度", "corroboration": "多源印证", "watchlist": "关注列表",
-        "fit": "兴趣匹配", "freshness": "新鲜度", "depth": "技术深度",
+        "fit": "兴趣匹配", "freshness": "新鲜度", "depth": "技术深度", "indie": "个人作品",
         "slop": "低质内容", "chatter": "无代码", "stale": "停更", "archived": "已归档",
         "mega": "已成名", "seen_before": "已出现过", "low_substance": "内容空洞",
         "shallow": "技术浅",

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 
@@ -17,6 +18,9 @@ from radar.models import UTC, Item, canonical_key, now
 from radar.sources.base import register
 
 log = logging.getLogger("radar.sources.community")
+
+ARXIV_INTERVAL = 3.1        # seconds between arXiv API calls (their stated limit is 3)
+_sleep = time.sleep         # replaced in tests
 
 HN_ITEM = "https://news.ycombinator.com/item?id={}"
 
@@ -85,7 +89,7 @@ class HackerNews:
                     author=hit.get("author"),
                     created_at=created,
                     metrics={"hn_points": points, "hn_comments": comments,
-                             "hn_id": hn_id},
+                             "hn_id": hn_id, **({"show_hn": True} if tag == "show_hn" else {})},
                     evidence=[f"HN {label}: {points} points, {comments} comments "
                               f"({HN_ITEM.format(hn_id)})"],
                 ))
@@ -160,13 +164,23 @@ class Arxiv:
         cutoff = now() - timedelta(days=days)
 
         items: list[Item] = []
+        last_call = 0.0
         for cat in cats:
+            # arXiv asks for 3 seconds between API calls; back to back, it
+            # answered six category queries with 429s and read timeouts.
+            # Cached answers don't count as calls.
+            wait = ARXIV_INTERVAL - (time.monotonic() - last_call)
+            if last_call and wait > 0:
+                _sleep(wait)
             resp = http.get(
                 "http://export.arxiv.org/api/query",
                 params={"search_query": f"cat:{cat}", "sortBy": "submittedDate",
                         "sortOrder": "descending", "max_results": per_cat},
             )
+            if resp is None or resp.headers.get("X-Radar-Cache") != "hit":
+                last_call = time.monotonic()
             if resp is None:
+                log.warning("arxiv: no answer for %s", cat)
                 continue
             try:
                 root = ET.fromstring(resp.content)

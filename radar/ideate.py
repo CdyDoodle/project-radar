@@ -43,7 +43,7 @@ class SignalCard(BaseModel):
     depth_reason: str = Field(description="Why that number. Cite something concrete.")
     frontier: str = Field(description="What is still unsolved, missing, or obviously weak here.")
     adjacent_ideas: list[str] = Field(description="2-4 things a strong engineer could build next to this.")
-    low_substance: bool = Field(description="True if this is content marketing, a tutorial, a list, or a thin wrapper.")
+    low_substance: bool = Field(description="True if this is content marketing, a tutorial, a list, or an empty launch post.")
 
 
 class KeyedCard(SignalCard):
@@ -54,14 +54,15 @@ class CardBatch(BaseModel):
     cards: list[KeyedCard]
 
 
-CARD_SYSTEM = """You are triaging technical signal for a senior software engineer \
-who is taking a year off to build something hard.
+CARD_SYSTEM = """You are triaging signal for a senior software engineer who is \
+becoming an independent developer, building AI products on their own.
 
-Judge substance, not popularity. A repo with 20k stars can be a wrapper; a paper \
+Judge substance, not popularity. A repo with 20k stars can be hollow; a paper \
 with no code can be the most valuable thing on the page. Set low_substance=true \
-for tutorials, awesome-lists, prompt collections, course material, thin API \
-wrappers, and launch posts with no engineering behind them -- regardless of how \
-much traction they have.
+for tutorials, awesome-lists, prompt collections, course material, and launch \
+posts with nothing behind them -- regardless of how much traction they have. A \
+small, focused product that real people use is NOT low substance even when its \
+engineering is simple: say so in technical_depth instead.
 
 You will get several items. Return exactly one card per item, carrying its ITEM ID \
 unchanged. Judge each item on its own; do not let one item's card borrow detail \

@@ -3,55 +3,77 @@
 #
 # Tune this file, then re-run `radar rank` (cheap, no network) to see
 # the ordering change. Nothing here is sacred -- the defaults are a
-# starting point for a senior engineer looking for hard problems.
+# starting point for an independent developer shipping AI products.
 ####################################################################
 
 [profile]
 # Free text about you. Not read by anything at the moment: it fed the
 # project briefs, which were removed. Kept for reference.
 description = """
-Senior software engineer taking a deliberate gap year. Strong general
-engineering background; wants to go deep rather than wide. Looking for projects
-that are technically challenging, that produce something real other engineers
-would use or learn from, and that build durable expertise -- not tutorials, not
-CRUD apps, not thin wrappers over an LLM API.
+Senior software engineer becoming an independent developer: building and
+shipping AI products alone, without a company behind them. Wants to see what
+other solo builders and small teams are shipping with AI -- coding agents, MCP
+servers, voice and vision apps, local-first and self-hosted tools, browser and
+desktop apps -- and which of them people actually adopt.
 
-Interested in using AI both as a subject (inference, agents, model internals)
-and as a tool (AI-assisted development of otherwise-intractable systems work).
-Has roughly 6-12 months and no revenue pressure, so multi-month projects with a
-steep learning curve are in scope. Prefers projects with a crisp technical
-thesis that can be falsified early.
+AI is both the subject (agents, models, inference) and the tool (Claude Code
+and friends doing most of the typing). Systems work still matters where it
+makes an AI product possible, but it is no longer the point.
 """
 
 [interests]
 # Weighted keywords. Higher = pulls harder. Matched as whole words (plurals
 # and hyphens allowed, so "agent" finds "agents" but not "reagent") against
 # title, description, topics, language and the first chunk of the README.
-"inference" = 1.0
-"compiler" = 1.0
-"distributed" = 0.9
-"database" = 0.9
-"kernel" = 0.8
-"runtime" = 0.8
-"agent" = 0.8
-"agentic" = 0.8
-"llm" = 0.7
-"cuda" = 0.9
-"gpu" = 0.8
-"quantization" = 0.9
-"scheduler" = 0.7
-"observability" = 0.6
-"wasm" = 0.7
-"rust" = 0.7
-"zig" = 0.6
-"formal verification" = 0.9
-"program synthesis" = 1.0
-"static analysis" = 0.8
-"protocol" = 0.6
-"storage" = 0.7
-"simulation" = 0.6
-"reverse engineering" = 0.7
-"emulator" = 0.7
+# AI products: what solo builders ship.
+"ai" = 0.6
+"agent" = 1.0
+"agentic" = 0.9
+"coding agent" = 1.0
+"claude code" = 0.9
+"mcp" = 0.9
+"llm" = 0.8
+"computer use" = 0.8
+"browser automation" = 0.7
+"ai assistant" = 0.7
+"voice" = 0.7
+"text to speech" = 0.6
+"speech to text" = 0.6
+"multimodal" = 0.6
+"image generation" = 0.5
+"video generation" = 0.5
+"rag" = 0.6
+"workflow" = 0.5
+"automation" = 0.6
+# AI security and safety: attacks on models and agents, and the defences.
+"ai security" = 0.9
+"llm security" = 0.9
+"agent security" = 0.9
+"prompt injection" = 0.9
+"jailbreak" = 0.7
+"red teaming" = 0.8
+"guardrail" = 0.8
+"ai safety" = 0.8
+"alignment" = 0.5
+"interpretability" = 0.7
+"sandbox" = 0.5
+"security" = 0.4
+# How they ship it.
+"indie" = 0.8
+"open source alternative" = 0.8
+"self hosted" = 0.7
+"local first" = 0.7
+"on device" = 0.6
+"desktop app" = 0.6
+"browser extension" = 0.6
+"saas" = 0.5
+"productivity" = 0.4
+# Systems work, where it makes an AI product possible.
+"inference" = 0.6
+"local llm" = 0.6
+"quantization" = 0.4
+"runtime" = 0.3
+"rust" = 0.3
 
 [rank]
 freshness_half_life_days = 45
@@ -100,10 +122,13 @@ theme_weight = 0.75
 # "ai-infra"       building the plumbing: engines, harnesses, routers, training
 # "ai-application" AI pointed at a domain: reverse engineering, video, science
 # "non-ai"         no AI at all -- databases, compilers, kernels
+#
+# Tilted toward applications: products built on AI are what an independent
+# developer ships, and non-AI work keeps only a small share.
 enabled = true
 "ai-infra" = 0.30
-"ai-application" = 0.40
-"non-ai" = 0.30
+"ai-application" = 0.55
+"non-ai" = 0.15
 
 [rank.weights]
 velocity = 1.0
@@ -111,7 +136,11 @@ corroboration = 1.4
 watchlist = 1.8
 fit = 1.6
 freshness = 0.7
-depth = 0.9
+# Depth rewards systems languages (Rust, C) and topics; most AI products are
+# TypeScript or Python, so it is kept low.
+depth = 0.4
+# A repo under a personal account or a Show HN launch: one person built it.
+indie = 0.9
 
 [rank.penalties]
 slop = 2.5
@@ -123,7 +152,8 @@ seen_before = 0.3
 # From Claude Code's signal cards, only on items that have one. Penalty-only:
 # a bonus would keep lifting the few items that get carded at all.
 low_substance = 2.0
-shallow = 0.8
+# Light: a simple product that people use is still worth seeing.
+shallow = 0.3
 
 ####################################################################
 # Sources
@@ -137,18 +167,28 @@ pages_per_user = 1
 # you're borrowing. Replace them with people whose work you actually respect --
 # the tool gets dramatically better when this list is personal.
 users = [
+  # AI and systems engineers whose taste carries over.
   "karpathy",
-  "jart",
-  "antirez",
   "simonw",
+  "ggerganov",
   "geohot",
   "mitchellh",
-  "bellard",
-  "tsoding",
-  "orlp",
-  "matklad",
-  "burntsushi",
-  "ggerganov",
+  "antirez",
+  # Independent developers shipping AI products.
+  "steipete",
+  "Nutlope",
+  "mckaywrigley",
+  "transitive-bullshit",
+  "steven-tey",
+  "yoheinakajima",
+  "jxnl",
+  "levelsio",
+  "marclou",
+  "danielmiessler",
+  # Independent developers in the Chinese AI scene.
+  "Yidadaa",
+  "lencx",
+  "zhayujie",
 ]
 
 [sources.github_search]
@@ -163,41 +203,52 @@ min_stars = 120
 per_query = 40
 # Each query is combined with the created/stars filters above.
 queries = [
-  "topic:compiler",
-  "topic:database",
-  "topic:distributed-systems",
+  # AI products and the pieces they are built from.
+  "topic:ai-agents",
+  "topic:agent",
+  "topic:llm",
+  "topic:mcp",
+  "topic:mcp-server",
+  "topic:claude-code",
+  "topic:coding-agent",
+  "topic:ai-assistant",
+  "topic:generative-ai",
+  "topic:rag",
+  "topic:browser-automation",
+  "topic:computer-use",
+  # AI security and safety.
+  "topic:ai-security",
+  "topic:llm-security",
+  "topic:prompt-injection",
+  "topic:jailbreak",
+  "topic:red-teaming",
+  "topic:guardrails",
+  "topic:ai-safety",
+  "topic:interpretability",
+  # Domains where one person can ship a whole product. Single topics work far
+  # better than pairs or free text -- GitHub topics are under-applied, so
+  # "topic:llm topic:tts" returns nothing while "topic:text-to-speech" returns
+  # the real projects and the ranker sorts out which of them use AI.
+  "topic:text-to-speech",
+  "topic:speech-recognition",
+  "topic:computer-vision",
+  "topic:image-generation",
+  "topic:video-generation",
+  "topic:self-hosted",
+  "topic:local-first",
+  "topic:browser-extension",
+  "topic:productivity",
+  "topic:automation",
+  # Systems work behind AI products.
   "topic:inference",
   "topic:llm language:rust",
-  "topic:llm language:c",
-  "topic:gpu",
-  "topic:wasm",
-  "topic:observability",
-  "language:zig",
-  "language:rust topic:performance",
-  "topic:formal-verification",
-  # Applied AI: hard domains where AI is the tool rather than the subject.
-  # Every query above hunts AI infrastructure, which is why the feed filled
-  # with inference engines. Single domain topics work far better here than
-  # topic pairs or free text -- GitHub topics are under-applied, so
-  # "topic:llm topic:fuzzing" returns nothing while "topic:fuzzing" returns
-  # the real projects and the ranker sorts out which of them use AI.
-  "topic:reverse-engineering",
-  "topic:binary-analysis",
-  "topic:static-analysis",
-  "topic:penetration-testing",
-  "topic:robotics",
-  "topic:computer-vision",
-  "topic:speech-recognition",
-  "topic:bioinformatics",
-  "topic:autonomous-driving",
-  "topic:code-review",
-  "topic:mcp-server",
 ]
 
 [sources.github_trending]
 enabled = true
 windows = ["daily", "weekly"]
-languages = ["", "rust", "zig", "c", "cpp", "go"]
+# Most AI products are TypeScript or Python.
+languages = ["", "typescript", "python", "rust", "go", "swift"]
 # The trending page has no star count, creation date or topics, so each repo
 # is looked up once through the API (cached). Without it fit, depth,
 # freshness and the mega penalty score trending repos on nothing.
@@ -208,7 +259,8 @@ hydrate_workers = 8
 enabled = true
 within_days = 21
 min_points = 120
-show_hn_min_points = 40
+# Show HN is where solo builders launch, so it gets a lower bar.
+show_hn_min_points = 25
 limit = 120
 
 [sources.lobsters]
@@ -220,7 +272,9 @@ min_score = 8
 enabled = true
 within_days = 21
 per_category = 40
-categories = ["cs.LG", "cs.PL", "cs.DC", "cs.OS", "cs.DB", "cs.AR"]
+# AI, language, software engineering, human-computer interaction, and
+# security (where prompt-injection and jailbreak papers land).
+categories = ["cs.AI", "cs.CL", "cs.SE", "cs.HC", "cs.CR"]
 
 [sources.github_activity]
 # What the watched engineers are building themselves: their own pushes, new
@@ -322,6 +376,24 @@ max_workers = 3
 # Default language of the dashboard and digest: "en" or "zh-CN". The page has
 # a toggle either way; this only picks what it shows first.
 language = "zh-CN"
+
+# Extra Overview lanes for subjects you follow: the highest-scoring items whose
+# name, description or topics match a term. ai_only (default true) keeps out
+# items with no AI in them, so "jailbreak" does not mean iPhones.
+[[report.topic_lanes]]
+key = "ai-security"
+en = "AI security & safety"
+zh = "AI 安全"
+note_en = "prompt injection, jailbreaks, guardrails, agent sandboxing, red teaming, alignment, interpretability"
+note_zh = "提示词注入、越狱、护栏、agent 沙箱、红队测试、对齐、可解释性"
+# Specific phrases only: bare "security", "safety", "privacy" or "sandbox"
+# turn up in ordinary product blurbs and filled this lane with a TV debloater.
+terms = ["ai security", "llm security", "agent security", "mcp security",
+         "security scanner", "security audit", "security testing", "ai safety",
+         "llm safety", "prompt injection", "jailbreak", "red teaming", "red team",
+         "guardrail", "adversarial", "alignment", "interpretability",
+         "vulnerability", "vulnerabilities", "malicious", "pentest",
+         "penetration testing", "threat model"]
 
 [storage]
 db = "radar.db"

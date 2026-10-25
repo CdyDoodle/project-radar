@@ -125,3 +125,20 @@ def test_paper_velocity_is_scaled_down(cfg):
     top_repo = rank.velocity(items[-1], corpus, cfg)
     top_paper = rank.velocity(papers[-1], corpus, cfg)
     assert top_repo == 0.9 and top_paper == 0.9 * 0.75
+
+
+def test_arxiv_categories_are_paced(cfg, monkeypatch):
+    from radar.sources import community
+    slept = []
+    monkeypatch.setattr(community, "_sleep", slept.append)
+
+    class Http:
+        def get(self, url, **kw):
+            class R:
+                content = b"<feed xmlns='http://www.w3.org/2005/Atom'/>"
+                headers = {}
+            return R()
+
+    cfg.raw["sources"] = {"arxiv": {"categories": ["cs.PL", "cs.OS", "cs.DB"]}}
+    community.Arxiv().fetch(cfg, Http())
+    assert len(slept) == 2                     # between the 3 calls, not before the first
