@@ -314,6 +314,21 @@ enabled = true
 days = 7
 per_day = 50
 
+[sources.hf_models]
+# Trending Hugging Face models and Spaces, through the public API (no account).
+# Small-model work is published here as weights and a model card long before
+# its GitHub repo, if any, gathers stars. Three listings: trending models,
+# trending models up to small_max parameters (the overall list buries them
+# under big releases), and trending Spaces (running demos and apps).
+enabled = true
+trending = 60
+small = 60
+small_max = "3B"
+spaces = 30
+# Below this many likes a listing entry is noise.
+min_likes = 20
+workers = 8
+
 [sources.bluesky]
 # Posts linking to a repo or paper, via the public search API (no account).
 # Off by default: the API refuses some networks outright (HTTP 403,

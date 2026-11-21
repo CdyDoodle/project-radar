@@ -56,6 +56,7 @@ SNAPSHOT_METRICS = frozenset({
     "stars", "forks", "open_issues", "age_days", "stars_per_day",
     "days_since_push", "archived", "fork", "stars_today", "stars_this_week",
     "impl_count", "impl_checked_at",
+    "hf_likes", "hf_downloads", "hf_trending", "params",
 })
 MAX_EVIDENCE = 12
 

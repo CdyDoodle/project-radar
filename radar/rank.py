@@ -94,7 +94,8 @@ def _text_of(item: Item) -> str:
     ]).lower()
 
 
-VELOCITY_METRICS = ("stars_per_day", "hn_points", "lobsters_score", "hf_upvotes", "bsky_likes")
+VELOCITY_METRICS = ("stars_per_day", "hn_points", "lobsters_score", "hf_upvotes",
+                    "hf_trending", "bsky_likes")
 
 
 class Corpus:
@@ -128,7 +129,7 @@ class Corpus:
 
 # Fallback ceilings, used only when the corpus is too small to form a distribution.
 FALLBACK_CEILING = {"stars_per_day": 120, "hn_points": 700, "lobsters_score": 60,
-                    "hf_upvotes": 150, "bsky_likes": 200}
+                    "hf_upvotes": 150, "hf_trending": 300, "bsky_likes": 200}
 
 
 def velocity(item: Item, corpus: Corpus | None = None, cfg: Config | None = None) -> float:
@@ -146,9 +147,10 @@ def velocity(item: Item, corpus: Corpus | None = None, cfg: Config | None = None
             continue
         pct = corpus.percentile(name, raw) if corpus else None
         val = pct if pct is not None else _norm_log(raw, FALLBACK_CEILING[name])
-        if name == "hf_upvotes":
-            # A percentile among featured papers, which are already curated;
-            # unscaled, a middling paper outranks a genuinely fast repo.
+        if name in ("hf_upvotes", "hf_trending"):
+            # A percentile among featured papers or trending models, which are
+            # already curated sets; unscaled, a middling one outranks a
+            # genuinely fast repo.
             val *= paper_scale
         parts.append(val)
     if m.get("trending_windows"):
@@ -234,7 +236,7 @@ def penalties(item: Item, cfg: Config, row=None) -> dict[str, float]:
     # A link with no code and no paper behind it. Fine to read, not a project.
     # Blog posts ride corroboration (HN + Lobsters) without carrying substance,
     # so make them earn their place on depth instead.
-    if item.key.startswith("url:") and not item.metrics.get("stars"):
+    if item.key.startswith("url:") and not item.metrics.get("stars")             and not item.metrics.get("hf_kind"):          # a model or Space is a thing
         out["chatter"] = max(0.0, 1.0 - depth(item) * 2.5)
 
     if item.metrics.get("archived"):

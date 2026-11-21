@@ -500,17 +500,27 @@ class Store:
 
         Falls back to the newest run, so `radar report` on its own still has a
         sensible boundary when no run id is passed.
+
+        Every `radar fetch` records a row here, but fetches within
+        `run_gap_hours` of the first are one run (see begin_fetch). A later
+        fetch in the same run answers with the run's first fetch, or what the
+        earlier fetches found would stop counting as new.
         """
+        row = None
         if run_id:
             row = self.conn.execute(
                 "SELECT started_at FROM runs WHERE id = ?", (run_id,)
             ).fetchone()
-            if row:
-                return row["started_at"]
-        row = self.conn.execute(
-            "SELECT started_at FROM runs ORDER BY started_at DESC LIMIT 1"
-        ).fetchone()
-        return row["started_at"] if row else None
+        if not row:
+            row = self.conn.execute(
+                "SELECT started_at FROM runs ORDER BY started_at DESC LIMIT 1"
+            ).fetchone()
+        if not row:
+            return None
+        started, first = _dt(row["started_at"]), _dt(self._meta("fetch_at"))
+        if started and first and timedelta(0) <= started - first < timedelta(hours=self.run_gap_hours):
+            return first.isoformat()
+        return row["started_at"]
 
     def count_since(self, since: str) -> int:
         """Items first seen at or after `since` (an ISO timestamp)."""

@@ -62,6 +62,8 @@ def _metrics_line(metrics: dict) -> dict:
         en.append(f"lob {int(metrics['lobsters_score'])}"); zh.append(f"Lobsters {int(metrics['lobsters_score'])} 分")
     if metrics.get("hf_upvotes"):
         en.append(f"HF {int(metrics['hf_upvotes'])}"); zh.append(f"HF {int(metrics['hf_upvotes'])} 赞")
+    if metrics.get("hf_likes"):
+        en.append(f"HF {int(metrics['hf_likes'])} likes"); zh.append(f"HF {int(metrics['hf_likes'])} 赞")
     if metrics.get("bsky_likes"):
         en.append(f"bsky {int(metrics['bsky_likes'])}"); zh.append(f"Bluesky {int(metrics['bsky_likes'])} 赞")
     if metrics.get("starred_by"):
@@ -100,6 +102,15 @@ def _reason(item, sources: list[str], is_new: bool, signals: dict | None = None)
         en.append(f"{int(m['hn_points'])} HN points"); zh.append(f"HN {int(m['hn_points'])} 分")
     if m.get("hf_upvotes"):
         en.append(f"{int(m['hf_upvotes'])} HF upvotes"); zh.append(f"Hugging Face {int(m['hf_upvotes'])} 赞")
+    if m.get("params"):
+        from radar.sources.huggingface import size_label
+        en.append(f"{size_label(m['params'])} parameters"); zh.append(f"{size_label(m['params'])} 参数")
+    if m.get("hf_likes"):
+        kind = "Space" if m.get("hf_kind") == "space" else "model"
+        en.append(f"{int(m['hf_likes'])} likes on the HF {kind}")
+        zh.append(f"Hugging Face {'Space' if kind == 'Space' else '模型'} {int(m['hf_likes'])} 赞")
+    if m.get("hf_downloads"):
+        en.append(f"{int(m['hf_downloads']):,} downloads"); zh.append(f"下载 {int(m['hf_downloads']):,} 次")
     if m.get("bsky_likes"):
         en.append(f"{int(m['bsky_likes'])} Bluesky likes"); zh.append(f"Bluesky {int(m['bsky_likes'])} 赞")
     if m.get("starred_by"):

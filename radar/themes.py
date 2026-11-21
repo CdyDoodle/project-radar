@@ -271,13 +271,16 @@ def of_item(item) -> set[str]:
         item.lang or "",
     ])
     found = classify(text)
+    # A model card can say "small" about anything; a known size settles it.
+    if (item.metrics.get("params") or 0) > 4_000_000_000:
+        found.discard("small-models")
     if found:
         return found
     # Structural fallback. A bare link that matched nothing is a headline with
     # no repo and no paper behind it -- a thing to read, not a thing to build.
     # No pattern list will ever cover those, and calling them "other" hides a
     # third of the feed behind a label that says nothing.
-    if item.key.startswith("url:"):
+    if item.key.startswith("url:") and not item.metrics.get("hf_kind"):
         return {DISCUSSION}
     return found
 

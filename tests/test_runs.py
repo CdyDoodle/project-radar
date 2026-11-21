@@ -166,3 +166,19 @@ def test_prune_reclaims_space(cfg):
     assert store.prune() == 300
     store.conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     assert cfg.db_path.stat().st_size < before / 2
+
+
+def test_a_later_fetch_in_the_same_run_keeps_the_runs_start(store):
+    # Three `radar fetch` calls in one evening are one run: what the first
+    # two found is still "new" after the third.
+    first_fetch = (now() - timedelta(hours=1)).isoformat()
+    store.conn.execute("INSERT OR REPLACE INTO meta VALUES ('fetch_seq', '5')")
+    store.conn.execute("INSERT OR REPLACE INTO meta VALUES ('fetch_at', ?)", (first_fetch,))
+    store.start_run("late")                                   # recorded now, an hour in
+    assert store.begin_fetch() == 5                           # same run
+    assert store.run_started("late") == first_fetch
+    # A run that began after the gap stands on its own start.
+    store.conn.execute("INSERT OR REPLACE INTO meta VALUES ('fetch_at', ?)",
+                       ((now() - timedelta(hours=9)).isoformat(),))
+    late = store.conn.execute("SELECT started_at FROM runs WHERE id='late'").fetchone()[0]
+    assert store.run_started("late") == late

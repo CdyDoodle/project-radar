@@ -44,7 +44,9 @@ class Http:
         return self.cache_dir / f"{h}.cache"
 
     def get(self, url: str, *, headers: dict | None = None, params: dict | None = None,
-            cache: bool = True, ttl: int | None = None) -> requests.Response | None:
+            cache: bool = True, ttl: int | None = None,
+            quiet: bool = False) -> requests.Response | None:
+        """`quiet`: a 4xx is an expected answer (does this exist?), not a fault."""
         if params:
             req = requests.Request("GET", url, params=params).prepare()
             url = req.url
@@ -65,7 +67,7 @@ class Http:
             log.warning("GET %s failed: %s", url, exc)
             return None
         if resp.status_code >= 400:
-            log.warning("GET %s -> %s %s", url, resp.status_code, resp.text[:180])
+            (log.debug if quiet and resp.status_code < 500 else log.warning)("GET %s -> %s %s", url, resp.status_code, resp.text[:180])
             return None
         if cache and ttl > 0:
             path.write_bytes(resp.content)
