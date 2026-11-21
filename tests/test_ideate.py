@@ -212,6 +212,7 @@ def test_finds_the_desktop_apps_packaged_copy(tmp_path, monkeypatch, cfg):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "Local"))
     monkeypatch.setenv("APPDATA", str(tmp_path / "Roaming-empty"))
     monkeypatch.setattr(ideate.shutil, "which", lambda name: None)
+    monkeypatch.setattr(ideate.Path, "home", lambda: tmp_path)       # no native install
     assert ideate.find_claude(cfg).endswith("2.1.280" + __import__("os").sep + "claude.exe")
 
 
@@ -225,8 +226,19 @@ def test_finds_the_newer_layout_with_a_build_hash_folder(tmp_path, monkeypatch, 
     monkeypatch.setenv("APPDATA", str(tmp_path / "Roaming"))
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "Local-empty"))
     monkeypatch.setattr(ideate.shutil, "which", lambda name: None)
+    monkeypatch.setattr(ideate.Path, "home", lambda: tmp_path)       # no native install
     found = ideate.find_claude(cfg)
     assert "2.1.295" in found and found.endswith("claude.exe")
+
+
+def test_finds_the_native_installers_copy(tmp_path, monkeypatch, cfg):
+    # The native installer puts claude in ~/.local/bin without adding it to PATH.
+    exe = tmp_path / ".local" / "bin" / "claude.exe"
+    exe.parent.mkdir(parents=True)
+    exe.write_bytes(b"")
+    monkeypatch.setattr(ideate.Path, "home", lambda: tmp_path)
+    monkeypatch.setattr(ideate.shutil, "which", lambda name: None)
+    assert ideate.find_claude(cfg) == str(exe)
 
 
 def test_api_key_is_withheld(monkeypatch):

@@ -87,8 +87,9 @@ class ClaudeCodeError(RuntimeError):
 def find_claude(cfg: Config) -> str | None:
     """Locate the `claude` executable.
 
-    Order: `claude.claude_path` in config, `RADAR_CLAUDE`, PATH, then the copy
-    the Claude desktop app bundles on Windows (newest version wins).
+    Order: `claude.claude_path` in config, `RADAR_CLAUDE`, PATH, the native
+    installer's ~/.local/bin (which it does not always put on PATH), then the
+    copy the Claude desktop app bundles on Windows (newest version wins).
     """
     for cand in (cfg.get("claude.claude_path"), os.environ.get("RADAR_CLAUDE")):
         if cand and Path(cand).exists():
@@ -96,6 +97,10 @@ def find_claude(cfg: Config) -> str | None:
     on_path = shutil.which("claude")
     if on_path:
         return on_path
+    for name in ("claude.exe", "claude"):
+        native = Path.home() / ".local" / "bin" / name
+        if native.is_file():
+            return str(native)
     bundled = bundled_claude_paths()
     if bundled:
         return max(bundled, key=lambda pv: pv[1])[0]
