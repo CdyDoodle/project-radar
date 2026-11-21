@@ -58,6 +58,18 @@ makes an AI product possible, but it is no longer the point.
 "interpretability" = 0.7
 "sandbox" = 0.5
 "security" = 0.4
+# Small models you train and run yourself.
+"small model" = 0.9
+"small language model" = 0.9
+"slm" = 0.8
+"decision model" = 0.9
+"tiny" = 0.4
+"distillation" = 0.6
+"fine tuning" = 0.6
+"from scratch" = 0.5
+"open weight" = 0.5
+"mlx" = 0.5
+"huggingface" = 0.4
 # How they ship it.
 "indie" = 0.8
 "open source alternative" = 0.8
@@ -216,6 +228,15 @@ queries = [
   "topic:rag",
   "topic:browser-automation",
   "topic:computer-use",
+  # Small models you train and run yourself.
+  "topic:small-language-models",
+  "topic:slm",
+  "topic:decision-model",
+  "topic:knowledge-distillation",
+  "topic:fine-tuning",
+  "topic:tinyml",
+  "topic:mlx",
+  "topic:on-device-ai",
   # AI security and safety.
   "topic:ai-security",
   "topic:llm-security",
@@ -378,8 +399,19 @@ max_workers = 3
 language = "zh-CN"
 
 # Extra Overview lanes for subjects you follow: the highest-scoring items whose
-# name, description or topics match a term. ai_only (default true) keeps out
-# items with no AI in them, so "jailbreak" does not mean iPhones.
+# name, description or topics match a term, or that radar/themes.py files
+# under one of `themes`. ai_only (default true) keeps out items with no AI in
+# them, so "jailbreak" does not mean iPhones. Lanes come in this order. Each
+# topic also keeps up to feed_min (default 40) of its best items in the Signal
+# feed, even when they rank below the general cut.
+[[report.topic_lanes]]
+key = "small-models"
+en = "Small-model innovation"
+zh = "小模型创新"
+note_en = "small models you train and run yourself: decision models, tiny TTS and LLMs, distilled and from-scratch models"
+note_zh = "自己能训练、自己能跑的小模型：决策模型、微型 TTS 与 LLM、蒸馏和从零训练的模型"
+themes = ["small-models"]
+
 [[report.topic_lanes]]
 key = "ai-security"
 en = "AI security & safety"

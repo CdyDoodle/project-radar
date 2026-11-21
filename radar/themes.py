@@ -38,6 +38,28 @@ THEME_PATTERNS: dict[str, str] = {
                      r"security (scanner|audit)s? (for|of) .{0,30}(ai|agent|llm|mcp|model)|"
                      r"interpretability|\balignment (research|tax|faking)|"
                      r"adversarial.(attack|prompt|example)",
+    # Small, specialised models you train and run yourself: decision models,
+    # typed classifiers, distilled or LoRA-tuned models, code compiled into a
+    # network. These rarely call themselves LLM projects, so nothing else
+    # caught them. NOT a bare "from scratch" ("Redis from scratch"), "LoRA"
+    # (the LoRa radio chip, and image-style LoRAs) or "distill" ("distill how
+    # anyone thinks into a skill"); "open weights" only for a model someone
+    # released, not an app that runs them. Parameter counts only up to ~3B.
+    "small-models":  r"small (language |vision |decision |specialized |open )?models?\b|"
+                     r"\bslms?\b|tiny (model|llm|lm|transformer|neural)|"
+                     r"decision.models?\b|typed.decisions?|"
+                     r"(knowledge|model|policy|reasoning) distillation|"
+                     r"distill(ed|ing|s)? (it |them )?(into|to) (a )?(small|tiny|smaller|student|\d)|"
+                     r"distilled (model|student|version)|"
+                     r"fine.?tun(e|ed|ing) (a |your own |small |tiny )|"
+                     r"(train|fine.?tune) and run|train (it |them )?(yourself|your own)|"
+                     r"(model|llm|gpt|transformer|lm)s? (trained )?from scratch|"
+                     r"from scratch .{0,20}(model|llm|gpt|transformer)|"
+                     r"\bnanogpt\b(?! for)|\bsmollm|\bmodernbert\b|\btinyml\b|"
+                     r"\b\d{1,3}(\.\d+)?m[ -]param|\b[0-3](\.\d+)?b[ -]param|"
+                     r"\b(my|our|an?) open.weights? .{0,40}model\b|differentiable.programming|"
+                     r"(code|program)s? into (a )?neural|"
+                     r"(open|small|tiny|local) (vision.language model|vlm)",
     # Skills, plugins and packs that extend an agent: the most common thing a
     # solo developer publishes right now, and none of the older themes saw it.
     "agent-skills":  r"\b(agent|claude|codex|ai)[ -]skills?\b|\bskills?[ -]pack\b|"
@@ -280,7 +302,7 @@ UNCLASSIFIED = "other"
 PRIORITY = [
     # What the thing does first; then the generic agent-extension buckets, so
     # a computer-use agent tagged `agent-skills` still files as computer use.
-    "ai-security", "computer-use", "voice-audio", "ai-media",
+    "small-models", "ai-security", "computer-use", "voice-audio", "ai-media",
     "agent-skills", "coding-agents", "mcp",
     "llm-inference", "emulation", "compilers-pl", "gpu-hpc", "os-kernel",
     "embedded-hw", "robotics", "virtualization", "databases", "distributed",
@@ -307,7 +329,7 @@ LABELS_ZH = {
     "ai-security": "AI 安全", "coding-agents": "编程 Agent", "mcp": "MCP 与工具接入",
     "computer-use": "电脑与浏览器操控", "voice-audio": "语音", "ai-media": "AI 图像与视频",
     "self-hosted": "自托管与本地优先",
-    "agent-skills": "Agent 技能与插件", "ai-apps": "AI 应用产品",
+    "agent-skills": "Agent 技能与插件", "small-models": "小模型创新", "ai-apps": "AI 应用产品",
     "llm-inference": "LLM 推理", "ai-agents": "AI 智能体", "ml-research": "机器学习研究",
     "compilers-pl": "编译器与语言", "databases": "数据库", "distributed": "分布式系统",
     "concurrency": "并发", "os-kernel": "操作系统内核", "embedded-hw": "嵌入式与硬件",

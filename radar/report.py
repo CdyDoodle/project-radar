@@ -239,20 +239,25 @@ def _topic_lanes(cfg: Config) -> list[dict]:
     out = []
     for t in cfg.get("report.topic_lanes", []) or []:
         terms = [x.lower() for x in t.get("terms", []) if x.strip()]
-        if not (t.get("key") and terms):
+        wanted = {x for x in t.get("themes", []) if x}
+        if not (t.get("key") and (terms or wanted)):
             continue
         en, zh = t.get("en") or t["key"], t.get("zh") or t.get("en") or t["key"]
-        out.append({"key": t["key"], "terms": terms, "ai_only": bool(t.get("ai_only", True)),
+        out.append({"key": t["key"], "terms": terms, "themes": wanted,
+                    "ai_only": bool(t.get("ai_only", True)),
+                    "feed_min": int(t.get("feed_min", 40)),
                     "title": _both(en, zh),
                     "note": _both(t.get("note_en", ""), t.get("note_zh") or t.get("note_en", ""))})
     return out
 
 
 def _on_topic(item, topic: dict) -> bool:
-    """Name, description and topics only: a README's boilerplate "Security"
-    section would put half the corpus in a security lane."""
+    """A theme from radar/themes.py, or a term in the name, description or
+    topics. Never the README: its boilerplate "Security" section would put
+    half the corpus in a security lane."""
     text = " ".join([item.title or "", item.summary or "", " ".join(item.topics)]).lower()
-    if not any(rank.term_pattern(term).search(text) for term in topic["terms"]):
+    if not (topic["themes"] & themes.of_item(item)
+            or any(rank.term_pattern(term).search(text) for term in topic["terms"])):
         return False
     return not topic["ai_only"] or axis.of_item(item) != axis.NON_AI
 
@@ -292,10 +297,24 @@ def _rows(store: Store, cfg: Config, limit: int, since: str | None = None) -> li
 
     The client can re-sort by raw score, so curated order is emitted as a
     position index rather than being the only thing available.
+
+    Topics you follow (`[[report.topic_lanes]]`) each keep up to `feed_min`
+    of their best items in the feed even below the cut, appended after the
+    curated list: a niche you asked for should not vanish because it trends
+    less than inference engines.
     """
     topics = _topic_lanes(cfg)
     ranked = store.items(limit=max(limit * 2, limit + 60))
     ordered = diversify.diversified(store, ranked, cfg, limit)
+    if topics:
+        have = {r["key"] for r in ordered}
+        for t in topics:
+            want = t["feed_min"] - sum(1 for r in ordered if _on_topic(store.to_item(r), t))
+            for r in store.items(limit=3000) if want > 0 else []:
+                if want <= 0:
+                    break
+                if r["key"] not in have and _on_topic(store.to_item(r), t):
+                    ordered.append(r); have.add(r["key"]); want -= 1
 
     items = [store.to_item(r) for r in ordered]
     theme_sets = [themes.of_item(it) for it in items]

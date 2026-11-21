@@ -48,6 +48,21 @@ PRIMARY = [
     ("x/axuse", "Installs for every harness (Codex, Claude Code, OpenCode)", [], "coding-agents"),
     ("x/studio", "Local voice cloning and text-to-speech studio", [], "voice-audio"),
     ("x/pdfchat", "Chat with your PDFs with AI", [], "ai-apps"),
+    # Small models you train and run yourself, and their look-alikes.
+    ("jaredpalmer/kev", "Jev-like family of decision models built on top of Qwen3.5 "
+     "you can train and run on your own", ["decision-model"], "small-models"),
+    ("x/tiny-voca", "A 4.5M-parameter two-voice text-to-speech model, trained from scratch",
+     [], "small-models"),
+    ("x/minimind", "Train your own 64M LLM from scratch in 2 hours", [], "small-models"),
+    ("x/handwired", "Turn your regular JavaScript code into a neural net",
+     ["differentiable-programming"], "small-models"),
+    ("x/adsb", "ADSB receiver abusing the SX1262 LoRa chip", [], "other"),
+    ("x/redis-rs", "Redis from scratch in Rust", [], "databases"),
+    ("x/nuwa", "Distill how anyone thinks into a reusable skill", ["agent-skills"], "agent-skills"),
+    ("x/corecoder", "Minimal AI coding agent. Think NanoGPT for coding agents.", [],
+     "coding-agents"),
+    ("x/atomic", "A local-first AI agent that runs open-weight models on your machine",
+     [], "llm-inference"),
     # The README story: its README said "operating system".
     ("audacity/audacity", "Audio Editor", ["audio"], "graphics-media"),
     # googletest was once filed as industry news for the word "google".

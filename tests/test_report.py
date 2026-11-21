@@ -113,3 +113,35 @@ def test_feed_quick_views_and_badges(store, cfg):
     assert views == {"": 2, "indie": 1, "topic:ai-security": 1, "new": 2}   # no saved: left out
     page = report.build(cfg, store, run_id="r1")[0].read_text(encoding="utf-8")
     assert 'data-quick="indie"' in page and 'class="bdg indie"' in page
+
+
+def test_topic_lane_by_theme(store, cfg):
+    cfg.raw["report"] = {"topic_lanes": [{"key": "small-models", "en": "Small models",
+                                          "zh": "小模型创新", "themes": ["small-models"]}]}
+    store.start_run("r1")
+    with store.tx():
+        store.upsert(repo("a/kev", "Decision models built on Qwen you can train and run yourself",
+                          stars=900))
+        store.upsert(repo("b/radio", "ADSB receiver using a LoRa chip", stars=900))
+    rank.rank_all(store, cfg)
+    lanes = {l["key"]: l for l in report._highlights(store, cfg, since=None)}
+    assert [i["title"] for i in lanes["topic:small-models"]["items"]] == ["a/kev"]
+
+
+def test_followed_topics_keep_items_in_the_feed(store, cfg):
+    cfg.raw["report"] = {"topic_lanes": [{"key": "small-models", "en": "Small models",
+                                          "zh": "小模型创新", "themes": ["small-models"],
+                                          "feed_min": 2}]}
+    with store.tx():
+        for i in range(6):
+            store.upsert(repo(f"big/infer{i}", "LLM inference server", stars=9000, stars_per_day=90))
+        store.upsert(repo("a/kev", "Decision models you can train and run yourself", stars=10))
+        store.upsert(repo("b/tts", "A 4.5M-parameter text-to-speech model", stars=10))
+    rank.rank_all(store, cfg)
+    keys = [r["key"] for r in report._rows(store, cfg, 3)]
+    assert {"gh:a/kev", "gh:b/tts"} <= set(keys) and len(keys) <= 5
+    lanes = cfg.raw["report"].pop("topic_lanes")
+    plain = [r["key"] for r in report._rows(store, cfg, 3)]
+    assert len(plain) == 3 and not {"gh:a/kev", "gh:b/tts"} <= set(plain)   # cut without it
+    assert keys[:3] == plain                    # the curated part is unchanged
+    cfg.raw["report"]["topic_lanes"] = lanes
